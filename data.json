@@ -16,8 +16,16 @@
   "italicUnderscoreEnabled": true,
   "declaredLinkPairs": {
     "Familie": {
+      "~Kontakte/Susanne Richter.md": [
+        "~Kontakte/Harald Richter.md",
+        "~Kontakte/Nils Richter.md"
+      ],
       "~Kontakte/Nora Heinzer.md": [
         "~Kontakte/Linus Heinzer.md"
+      ],
+      "~Kontakte/Nils Richter.md": [
+        "~Kontakte/Harald Richter.md",
+        "~Kontakte/Susanne Richter.md"
       ],
       "~Kontakte/Linus Heinzer.md": [
         "~Kontakte/Julia Langhammer.md",
@@ -28,6 +36,10 @@
       "~Kontakte/Julia Langhammer.md": [
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Clara Langhammer.md"
+      ],
+      "~Kontakte/Harald Richter.md": [
+        "~Kontakte/Nils Richter.md",
+        "~Kontakte/Susanne Richter.md"
       ],
       "~Kontakte/Dina Ristić.md": [
         "~Kontakte/Linus Heinzer.md",
