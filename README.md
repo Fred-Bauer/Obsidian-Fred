@@ -24,6 +24,7 @@ Reziproke Verlinkung über beliebige Frontmatter-Properties (z. B. `Familie`), u
 
 - Befehl **„Property-Backlinking aktualisieren“** stößt den Abgleich manuell an
 - optional: Live-Abgleich direkt beim Speichern
+- optional: **Reihenfolge aus TYP-System übernehmen** – eine dabei neu angelegte Property landet an ihrem Platz laut Frontmatter-Sortierung des TYP-Systems (über dessen `placeProperty()`), statt am Ende; nur sie wird einsortiert, der Rest bleibt unverändert
 
 Einstellungen: **Generell** → *Property-Backlinking*.
 

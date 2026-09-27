@@ -62,13 +62,19 @@ function getTargetSet(pairs, propertyName, sourcePath) {
   return new Set(pairs?.[propertyName]?.[sourcePath] ?? []);
 }
 
-async function addLinkToProperty(app, propertyName, ownerFile, targetFile) {
+// typOrder: eine dabei NEU angelegte Property per TYP-System (placeProperty)
+// an ihren Platz laut dessen Frontmatter-Sortierung setzen, statt sie am Ende
+// anzuhängen - nur diese eine, der Rest bleibt unverändert. Ohne TYP-System
+// (oder in einer Version ohne placeProperty) bleibt es beim Anhängen.
+async function addLinkToProperty(app, propertyName, ownerFile, targetFile, typOrder) {
   await app.fileManager.processFrontMatter(ownerFile, (frontmatter) => {
     const current = toArray(frontmatter[propertyName]);
     const alreadyThere = resolveLinkTargets(app, ownerFile, current).some((f) => f.path === targetFile.path);
     if (alreadyThere) return;
+    const isNew = !Object.prototype.hasOwnProperty.call(frontmatter, propertyName);
     const link = app.fileManager.generateMarkdownLink(targetFile, ownerFile.path);
     frontmatter[propertyName] = [...current, link];
+    if (isNew && typOrder) app.plugins.plugins["typ-system"]?.placeProperty?.(frontmatter, propertyName);
   });
 }
 
@@ -86,7 +92,7 @@ async function removeLinkFromProperty(app, propertyName, ownerFile, targetPath) 
   });
 }
 
-async function applyChanges(app, propertyNames, previousPairs, currentPairs) {
+async function applyChanges(app, propertyNames, previousPairs, currentPairs, typOrder) {
   let added = 0;
   let removed = 0;
 
@@ -107,7 +113,7 @@ async function applyChanges(app, propertyNames, previousPairs, currentPairs) {
         const targetFile = app.vault.getAbstractFileByPath(targetPath);
         if (!(sourceFile instanceof TFile) || !(targetFile instanceof TFile)) continue;
 
-        await addLinkToProperty(app, propertyName, targetFile, sourceFile);
+        await addLinkToProperty(app, propertyName, targetFile, sourceFile, typOrder);
         console.log(`[Property-Backlinking] "${propertyName}": ${targetFile.path} <- ${sourceFile.path} ergänzt`);
         added++;
       }
@@ -128,12 +134,12 @@ async function applyChanges(app, propertyNames, previousPairs, currentPairs) {
   return { added, removed };
 }
 
-async function syncAllLinks(app, propertyNames, previousPairs) {
+async function syncAllLinks(app, propertyNames, previousPairs, { typOrder = false } = {}) {
   const files = app.vault.getMarkdownFiles();
   console.log(`[Property-Backlinking] Prüfe ${files.length} Notizen für Properties: ${propertyNames.join(", ")}`);
 
   const currentPairs = computeDeclaredPairs(app, propertyNames, files);
-  const { added, removed } = await applyChanges(app, propertyNames, previousPairs, currentPairs);
+  const { added, removed } = await applyChanges(app, propertyNames, previousPairs, currentPairs, typOrder);
 
   return {
     checked: files.length,
@@ -157,7 +163,9 @@ function registerPropertyBacklinksLive(plugin) {
     }
     running = true;
     try {
-      const result = await syncAllLinks(plugin.app, plugin.settings.reciprocalLinkProperties, plugin.settings.declaredLinkPairs);
+      const result = await syncAllLinks(plugin.app, plugin.settings.reciprocalLinkProperties, plugin.settings.declaredLinkPairs, {
+        typOrder: plugin.settings.propertyBacklinksTypOrder,
+      });
       plugin.settings.declaredLinkPairs = result.declaredPairs;
       await plugin.saveSettings();
     } catch (e) {

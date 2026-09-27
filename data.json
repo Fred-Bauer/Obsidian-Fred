@@ -12,6 +12,7 @@
     "Freunde"
   ],
   "propertyBacklinksLiveEnabled": true,
+  "propertyBacklinksTypOrder": true,
   "nestedCheckboxSyncEnabled": true,
   "italicUnderscoreEnabled": true,
   "declaredLinkPairs": {
@@ -21,21 +22,37 @@
         "~Kontakte/Nils Richter.md"
       ],
       "~Kontakte/Nora Heinzer.md": [
-        "~Kontakte/Linus Heinzer.md"
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Joachim Heinzer.md",
+        "~Kontakte/Beate Heinzer.md"
       ],
       "~Kontakte/Nils Richter.md": [
         "~Kontakte/Harald Richter.md",
         "~Kontakte/Susanne Richter.md"
       ],
+      "~Kontakte/Margot Bölte.md": [
+        "~Kontakte/Dina Ristić.md"
+      ],
       "~Kontakte/Linus Heinzer.md": [
-        "~Kontakte/Julia Langhammer.md",
+        "~Kontakte/Clara Langhammer.md",
         "~Kontakte/Dina Ristić.md",
-        "~Kontakte/Nora Heinzer.md",
-        "~Kontakte/Clara Langhammer.md"
+        "~Kontakte/Julia Langhammer.md",
+        "~Kontakte/Beate Heinzer.md",
+        "~Kontakte/Joachim Heinzer.md",
+        "~Kontakte/Nora Heinzer.md"
+      ],
+      "~Kontakte/Liam Brüll.md": [
+        "~Kontakte/Andreas Brüll.md"
       ],
       "~Kontakte/Julia Langhammer.md": [
         "~Kontakte/Linus Heinzer.md",
-        "~Kontakte/Clara Langhammer.md"
+        "~Kontakte/Clara Langhammer.md",
+        "~Kontakte/Dina Ristić.md"
+      ],
+      "~Kontakte/Joachim Heinzer.md": [
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Beate Heinzer.md",
+        "~Kontakte/Nora Heinzer.md"
       ],
       "~Kontakte/Harald Richter.md": [
         "~Kontakte/Nils Richter.md",
@@ -43,32 +60,110 @@
       ],
       "~Kontakte/Dina Ristić.md": [
         "~Kontakte/Linus Heinzer.md",
-        "~Kontakte/Clara Langhammer.md"
+        "~Kontakte/Clara Langhammer.md",
+        "~Kontakte/Margot Bölte.md",
+        "~Kontakte/Julia Langhammer.md"
       ],
       "~Kontakte/Clara Langhammer.md": [
         "~Kontakte/Dina Ristić.md",
-        "~Kontakte/Julia Langhammer.md",
-        "~Kontakte/Linus Heinzer.md"
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Julia Langhammer.md"
+      ],
+      "~Kontakte/Beate Heinzer.md": [
+        "~Kontakte/Joachim Heinzer.md",
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Nora Heinzer.md"
+      ],
+      "~Kontakte/Andreas Brüll.md": [
+        "~Kontakte/Liam Brüll.md"
       ]
     },
     "Freunde": {
-      "~Kontakte/Nils Richter.md": [
+      "~Kontakte/Teresa Steinmetz.md": [
+        "~Kontakte/Justine Schmandt.md",
+        "~Kontakte/Fiene ♥️.md",
+        "~Kontakte/Leo Ulreich.md",
         "~Kontakte/Linus Heinzer.md"
+      ],
+      "~Kontakte/Sarah.md": [
+        "~Kontakte/Fiene ♥️.md"
+      ],
+      "~Kontakte/Pablo.md": [
+        "~Kontakte/Fiene ♥️.md"
+      ],
+      "~Kontakte/Nils Richter.md": [
+        "~Kontakte/Liam Brüll.md",
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Maxim Gubo.md",
+        "~Kontakte/Jan-Niklas Lepper.md"
+      ],
+      "~Kontakte/Maxim Gubo.md": [
+        "~Kontakte/Nils Richter.md",
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Liam Brüll.md"
+      ],
+      "~Kontakte/Lisa Bender.md": [
+        "~Kontakte/Justine Schmandt.md",
+        "~Kontakte/Lena Michelle Schäfer.md",
+        "~Kontakte/Leo Ulreich.md"
       ],
       "~Kontakte/Linus Heinzer.md": [
         "~Kontakte/Liam Brüll.md",
+        "~Kontakte/Maxim Gubo.md",
         "~Kontakte/Nils Richter.md",
+        "~Kontakte/Fiene ♥️.md",
         "~Kontakte/Justine Schmandt.md",
-        "~Kontakte/Leo Ulreich.md"
+        "~Kontakte/Leo Ulreich.md",
+        "~Kontakte/Laurent Skalski.md",
+        "~Kontakte/Teresa Steinmetz.md"
       ],
       "~Kontakte/Liam Brüll.md": [
-        "~Kontakte/Linus Heinzer.md"
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Nils Richter.md",
+        "~Kontakte/Maxim Gubo.md",
+        "~Kontakte/Fiene ♥️.md",
+        "~Kontakte/Laurent Skalski.md",
+        "~Kontakte/Gleb Maksymov.md"
       ],
       "~Kontakte/Leo Ulreich.md": [
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Fiene ♥️.md",
+        "~Kontakte/Lena Michelle Schäfer.md",
+        "~Kontakte/Lisa Bender.md",
+        "~Kontakte/Teresa Steinmetz.md"
+      ],
+      "~Kontakte/Lena Michelle Schäfer.md": [
+        "~Kontakte/Justine Schmandt.md",
+        "~Kontakte/Lisa Bender.md",
+        "~Kontakte/Leo Ulreich.md"
+      ],
+      "~Kontakte/Laurent Skalski.md": [
+        "~Kontakte/Fiene ♥️.md",
+        "~Kontakte/Liam Brüll.md",
         "~Kontakte/Linus Heinzer.md"
       ],
       "~Kontakte/Justine Schmandt.md": [
-        "~Kontakte/Linus Heinzer.md"
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Fiene ♥️.md",
+        "~Kontakte/Lena Michelle Schäfer.md",
+        "~Kontakte/Lisa Bender.md",
+        "~Kontakte/Teresa Steinmetz.md"
+      ],
+      "~Kontakte/Jan-Niklas Lepper.md": [
+        "~Kontakte/Nils Richter.md"
+      ],
+      "~Kontakte/Gleb Maksymov.md": [
+        "~Kontakte/Liam Brüll.md"
+      ],
+      "~Kontakte/Fiene ♥️.md": [
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Justine Schmandt.md",
+        "~Kontakte/Leo Ulreich.md",
+        "~Kontakte/Liam Brüll.md",
+        "~Kontakte/Laurent Skalski.md",
+        "~Kontakte/Pablo.md",
+        "~Kontakte/Sarah.md",
+        "~Kontakte/Teresa Steinmetz.md"
       ]
     }
   },

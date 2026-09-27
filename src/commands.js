@@ -21,7 +21,9 @@ function registerCommands(plugin) {
     id: "property-sync",
     name: "Property-Backlinking - Aktualisieren",
     callback: async () => {
-      const result = await syncAllLinks(plugin.app, plugin.settings.reciprocalLinkProperties, plugin.settings.declaredLinkPairs);
+      const result = await syncAllLinks(plugin.app, plugin.settings.reciprocalLinkProperties, plugin.settings.declaredLinkPairs, {
+        typOrder: plugin.settings.propertyBacklinksTypOrder,
+      });
       plugin.settings.declaredLinkPairs = result.declaredPairs;
       await plugin.saveSettings();
       new Notice(`Property-Backlinking: ${result.checked} Notizen geprüft, ${result.added} ergänzt, ${result.removed} entfernt.`);

@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   databaseFolderCountAtEnd: false,
   reciprocalLinkProperties: ["Familie"],
   propertyBacklinksLiveEnabled: true,
+  propertyBacklinksTypOrder: true,
   nestedCheckboxSyncEnabled: false,
   italicUnderscoreEnabled: false,
   declaredLinkPairs: {},
@@ -142,6 +143,19 @@ class FredSettingTab extends PluginSettingTab {
           .addToggle((toggle) =>
             toggle.setValue(this.plugin.settings.propertyBacklinksLiveEnabled).onChange(async (value) => {
               this.plugin.settings.propertyBacklinksLiveEnabled = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Reihenfolge aus TYP-System übernehmen")
+          .setDesc(
+            "Legt das Backlinking eine Property in einer Notiz neu an, landet sie an ihrem Platz laut Frontmatter-Sortierung des TYP-Systems (globale Reihenfolge, TYP-Frontmatter samt Floating Properties) statt am Ende. Nur die neue Property wird einsortiert, die übrigen bleiben, wie sie sind. Ohne aktiviertes TYP-System wird wie bisher angehängt."
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.propertyBacklinksTypOrder).onChange(async (value) => {
+              this.plugin.settings.propertyBacklinksTypOrder = value;
               await this.plugin.saveSettings();
             })
           )
