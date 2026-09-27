@@ -1,4 +1,4 @@
-const { PluginSettingTab, Setting, Notice, setIcon } = require("obsidian");
+const { PluginSettingTab, SettingGroup, Notice, setIcon } = require("obsidian");
 const { PluginPickerModal } = require("./important-plugins");
 
 const DEFAULT_SETTINGS = {
@@ -55,151 +55,165 @@ class FredSettingTab extends PluginSettingTab {
     else if (this.activeTab === "media") this.displayMediaTab(content);
   }
 
+  // Jeder Abschnitt ist eine SettingGroup - Obsidians eigene Gruppierung
+  // (Überschrift + eine Box, Einträge darin durch Trennlinien getrennt), wie
+  // in den Core-Einstellungen. Einzeln per new Setting(containerEl) angelegte
+  // Einträge würden stattdessen je als eigene kleine Box gerendert.
   displayGeneralTab(containerEl) {
-    containerEl.createEl("h4", { text: "Datenbank-Ordner" });
-
-    new Setting(containerEl)
-      .setName("Präfix-Ordner als Datenbank behandeln")
-      .setDesc("Ordner, deren Name mit dem Präfix beginnt, sind im Dateibaum nicht mehr auf-/zuklappbar.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.databaseFoldersEnabled).onChange(async (value) => {
-          this.plugin.settings.databaseFoldersEnabled = value;
-          await this.plugin.saveSettings();
-          this.plugin.updateDatabaseFolderStyle?.();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Präfix")
-      .setDesc("Ordnernamen, die mit diesem Zeichen/Text beginnen, gelten als Datenbank-Ordner.")
-      .addText((text) =>
-        text.setValue(this.plugin.settings.databaseFolderPrefix).onChange(async (value) => {
-          this.plugin.settings.databaseFolderPrefix = value;
-          await this.plugin.saveSettings();
-          this.plugin.updateDatabaseFolderStyle?.();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Folder-Notes-Erweiterung: gesamte Zeile klickbar")
-      .setDesc(
-        "Bei Datenbank-Ordnern öffnet ein Klick irgendwo in der Titelzeile (nicht nur auf dem Namen) die zugehörige Folder-Note, sofern das Folder-Notes-Plugin genutzt wird."
+    new SettingGroup(containerEl)
+      .setHeading("Datenbank-Ordner")
+      .addSetting((setting) =>
+        setting
+          .setName("Präfix-Ordner als Datenbank behandeln")
+          .setDesc("Ordner, deren Name mit dem Präfix beginnt, sind im Dateibaum nicht mehr auf-/zuklappbar.")
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.databaseFoldersEnabled).onChange(async (value) => {
+              this.plugin.settings.databaseFoldersEnabled = value;
+              await this.plugin.saveSettings();
+              this.plugin.updateDatabaseFolderStyle?.();
+            })
+          )
       )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.folderNoteClickExtensionEnabled).onChange(async (value) => {
-          this.plugin.settings.folderNoteClickExtensionEnabled = value;
-          await this.plugin.saveSettings();
-          this.plugin.updateDatabaseFolderStyle?.();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Anzahl am Zeilenende anzeigen")
-      .setDesc("Zeigt die .md-Datei-Anzahl statt an Stelle des Pfeils am Zeilenende an, wie sonst die Dateiendung.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.databaseFolderCountAtEnd).onChange(async (value) => {
-          this.plugin.settings.databaseFolderCountAtEnd = value;
-          await this.plugin.saveSettings();
-          this.plugin.updateDatabaseFolderStyle?.();
-        })
-      );
-
-    containerEl.createEl("h4", { text: "Property-Backlinking" });
-
-    new Setting(containerEl)
-      .setName("Properties")
-      .setDesc(
-        "Kommagetrennte Liste von Frontmatter-Properties mit Links zu anderen Notizen (z. B. Familie, Freunde) - gilt für alle Notizen, unabhängig vom TYP. Verlinkt eine Notiz hier eine andere, bekommt die andere automatisch den Backlink in derselben Property ergänzt - und wieder entfernt, sobald die Verlinkung wegfällt. Groß-/Kleinschreibung muss exakt zum Property-Namen passen."
+      .addSetting((setting) =>
+        setting
+          .setName("Präfix")
+          .setDesc("Ordnernamen, die mit diesem Zeichen/Text beginnen, gelten als Datenbank-Ordner.")
+          .addText((text) =>
+            text.setValue(this.plugin.settings.databaseFolderPrefix).onChange(async (value) => {
+              this.plugin.settings.databaseFolderPrefix = value;
+              await this.plugin.saveSettings();
+              this.plugin.updateDatabaseFolderStyle?.();
+            })
+          )
       )
-      .addText((text) =>
-        text
-          .setValue(this.plugin.settings.reciprocalLinkProperties.join(", "))
-          .onChange(async (value) => {
-            this.plugin.settings.reciprocalLinkProperties = value
-              .split(",")
-              .map((name) => name.trim())
-              .filter((name) => name.length > 0);
-            await this.plugin.saveSettings();
+      .addSetting((setting) =>
+        setting
+          .setName("Folder-Notes-Erweiterung: gesamte Zeile klickbar")
+          .setDesc(
+            "Bei Datenbank-Ordnern öffnet ein Klick irgendwo in der Titelzeile (nicht nur auf dem Namen) die zugehörige Folder-Note, sofern das Folder-Notes-Plugin genutzt wird."
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.folderNoteClickExtensionEnabled).onChange(async (value) => {
+              this.plugin.settings.folderNoteClickExtensionEnabled = value;
+              await this.plugin.saveSettings();
+              this.plugin.updateDatabaseFolderStyle?.();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Anzahl am Zeilenende anzeigen")
+          .setDesc("Zeigt die .md-Datei-Anzahl statt an Stelle des Pfeils am Zeilenende an, wie sonst die Dateiendung.")
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.databaseFolderCountAtEnd).onChange(async (value) => {
+              this.plugin.settings.databaseFolderCountAtEnd = value;
+              await this.plugin.saveSettings();
+              this.plugin.updateDatabaseFolderStyle?.();
+            })
+          )
+      );
+
+    new SettingGroup(containerEl)
+      .setHeading("Property-Backlinking")
+      .addSetting((setting) =>
+        setting
+          .setName("Properties")
+          .setDesc(
+            "Kommagetrennte Liste von Frontmatter-Properties mit Links zu anderen Notizen (z. B. Familie, Freunde) - gilt für alle Notizen, unabhängig vom TYP. Verlinkt eine Notiz hier eine andere, bekommt die andere automatisch den Backlink in derselben Property ergänzt - und wieder entfernt, sobald die Verlinkung wegfällt. Groß-/Kleinschreibung muss exakt zum Property-Namen passen."
+          )
+          .addText((text) =>
+            text
+              .setValue(this.plugin.settings.reciprocalLinkProperties.join(", "))
+              .onChange(async (value) => {
+                this.plugin.settings.reciprocalLinkProperties = value
+                  .split(",")
+                  .map((name) => name.trim())
+                  .filter((name) => name.length > 0);
+                await this.plugin.saveSettings();
+              })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Live aktualisieren")
+          .setDesc(
+            "Property-Backlinking sofort beim Speichern abgleichen, statt nur auf Befehl (\"Property-Backlinking aktualisieren\")."
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.propertyBacklinksLiveEnabled).onChange(async (value) => {
+              this.plugin.settings.propertyBacklinksLiveEnabled = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      );
+
+    new SettingGroup(containerEl)
+      .setHeading("Checklisten")
+      .addSetting((setting) =>
+        setting
+          .setName("Verschachtelte Checkboxen mit umschalten")
+          .setDesc(
+            "Beim (Ent)Haken einer Checkbox werden alle darunter verschachtelten Checkboxen automatisch mit (ent)hakt - und umgekehrt: sind alle Checkboxen einer Unterliste angehakt, wird die übergeordnete Checkbox automatisch mit angehakt, und wieder entfernt, sobald eine davon wieder abgehakt wird."
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.nestedCheckboxSyncEnabled).onChange(async (value) => {
+              this.plugin.settings.nestedCheckboxSyncEnabled = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      );
+
+    new SettingGroup(containerEl)
+      .setHeading("Formatierung")
+      .addSetting((setting) =>
+        setting
+          .setName("Kursiv mit Unterstrichen")
+          .setDesc(
+            'Der Befehl "Kursiv umschalten" setzt beim Einfügen Unterstriche (_Text_) statt Sternchen (*Text*) um die Auswahl. Bereits vorhandene Kursivformatierung (mit * oder _) wird beim erneuten Umschalten weiterhin korrekt erkannt und entfernt.'
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.italicUnderscoreEnabled).onChange(async (value) => {
+              this.plugin.settings.italicUnderscoreEnabled = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      );
+
+    // "+"-Button als Extra-Button im Gruppen-Header (wie z. B. bei Obsidians
+    // Hotkey-Gruppe), die Liste selbst in einem einzigen Eintrag der Gruppe
+    // unter dessen Beschreibung.
+    let listEl;
+    new SettingGroup(containerEl)
+      .setHeading("Important Plugin Settings")
+      .addExtraButton((button) =>
+        button
+          .setIcon("plus")
+          .setTooltip("Plugin hinzufügen")
+          .onClick(() => {
+            const manifests = this.plugin.app.plugins.manifests;
+            const candidates = Object.keys(this.plugin.app.plugins.plugins)
+              .filter((id) => manifests[id] && !this.plugin.settings.importantPlugins.includes(id))
+              .map((id) => manifests[id])
+              .sort((a, b) => a.name.localeCompare(b.name));
+
+            if (candidates.length === 0) {
+              new Notice("Keine weiteren aktivierten Plugins verfügbar.");
+              return;
+            }
+
+            new PluginPickerModal(this.plugin.app, candidates, async (id) => {
+              if (!id) return;
+              this.plugin.settings.importantPlugins.push(id);
+              await this.plugin.saveSettings();
+              this.plugin.refreshImportantPluginCommands?.();
+              renderImportantPluginsList();
+            }).open();
           })
-      );
-
-    new Setting(containerEl)
-      .setName("Live aktualisieren")
-      .setDesc(
-        "Property-Backlinking sofort beim Speichern abgleichen, statt nur auf Befehl (\"Property-Backlinking aktualisieren\")."
       )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.propertyBacklinksLiveEnabled).onChange(async (value) => {
-          this.plugin.settings.propertyBacklinksLiveEnabled = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    containerEl.createEl("h4", { text: "Checklisten" });
-
-    new Setting(containerEl)
-      .setName("Verschachtelte Checkboxen mit umschalten")
-      .setDesc(
-        "Beim (Ent)Haken einer Checkbox werden alle darunter verschachtelten Checkboxen automatisch mit (ent)hakt - und umgekehrt: sind alle Checkboxen einer Unterliste angehakt, wird die übergeordnete Checkbox automatisch mit angehakt, und wieder entfernt, sobald eine davon wieder abgehakt wird."
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.nestedCheckboxSyncEnabled).onChange(async (value) => {
-          this.plugin.settings.nestedCheckboxSyncEnabled = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    containerEl.createEl("h4", { text: "Formatierung" });
-
-    new Setting(containerEl)
-      .setName("Kursiv mit Unterstrichen")
-      .setDesc(
-        'Der Befehl "Kursiv umschalten" setzt beim Einfügen Unterstriche (_Text_) statt Sternchen (*Text*) um die Auswahl. Bereits vorhandene Kursivformatierung (mit * oder _) wird beim erneuten Umschalten weiterhin korrekt erkannt und entfernt.'
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.italicUnderscoreEnabled).onChange(async (value) => {
-          this.plugin.settings.italicUnderscoreEnabled = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    containerEl.createEl("h4", { text: "Important Plugin Settings" });
-
-    // Header mit "+"-Button neben der Beschreibung statt einer eigenen
-    // Setting-Zeile darunter - gleicher Aufbau wie der Header der globalen
-    // Property-Reihenfolge im TYP-System-Plugin.
-    const importantPluginsHeader = containerEl.createDiv({ cls: "fred-important-plugins-header" });
-    importantPluginsHeader.createEl("p", {
-      cls: "setting-item-description",
-      text: "Eigener Befehl je Plugin, um dessen Einstellungen direkt zu öffnen.",
-    });
-    const addImportantPluginBtn = importantPluginsHeader.createDiv({
-      cls: "clickable-icon",
-      attr: { "aria-label": "Plugin hinzufügen" },
-    });
-    setIcon(addImportantPluginBtn, "plus");
-    addImportantPluginBtn.addEventListener("click", () => {
-      const manifests = this.plugin.app.plugins.manifests;
-      const candidates = Object.keys(this.plugin.app.plugins.plugins)
-        .filter((id) => manifests[id] && !this.plugin.settings.importantPlugins.includes(id))
-        .map((id) => manifests[id])
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      if (candidates.length === 0) {
-        new Notice("Keine weiteren aktivierten Plugins verfügbar.");
-        return;
-      }
-
-      new PluginPickerModal(this.plugin.app, candidates, async (id) => {
-        if (!id) return;
-        this.plugin.settings.importantPlugins.push(id);
-        await this.plugin.saveSettings();
-        this.plugin.refreshImportantPluginCommands?.();
-        renderImportantPluginsList();
-      }).open();
-    });
-
-    const listEl = containerEl.createDiv({ cls: "fred-important-plugins-list" });
+      .addSetting((setting) => {
+        setting.setDesc("Eigener Befehl je Plugin, um dessen Einstellungen direkt zu öffnen.");
+        listEl = setting.infoEl.createDiv({ cls: "fred-important-plugins-list" });
+      });
 
     const renderImportantPluginsList = () => {
       listEl.empty();
@@ -211,13 +225,13 @@ class FredSettingTab extends PluginSettingTab {
       );
 
       if (enabledIds.length === 0) {
-        listEl.createEl("p", { cls: "setting-item-description", text: "Keine wichtigen Plugins eingetragen." });
+        listEl.createDiv({ cls: "setting-item-description", text: "Keine wichtigen Plugins eingetragen." });
         return;
       }
 
-      // Bewusst kein new Setting() je Zeile - dessen reguläres Padding/
-      // Schriftgröße wirkt für eine reine Name+Entfernen-Liste zu wuchtig.
-      // Schlichte eigene Zeile stattdessen.
+      // Bewusst kein eigener Setting-Eintrag je Zeile - dessen reguläres
+      // Padding/Schriftgröße wirkt für eine reine Name+Entfernen-Liste zu
+      // wuchtig. Schlichte eigene Zeile stattdessen.
       for (const id of enabledIds) {
         const row = listEl.createDiv({ cls: "fred-important-plugins-row" });
         row.createSpan({ cls: "fred-important-plugins-name", text: manifests[id].name });
@@ -238,48 +252,53 @@ class FredSettingTab extends PluginSettingTab {
   }
 
   displayKontakteTab(containerEl) {
-    containerEl.createEl("h4", { text: "Kontaktimport" });
-
-    new Setting(containerEl)
-      .setName("CSV-Datei")
-      .setDesc("Pfad zur Kontakte-CSV, relativ zum Vault-Root.")
-      .addText((text) =>
-        text.setValue(this.plugin.settings.contactsCsvPath).onChange(async (value) => {
-          this.plugin.settings.contactsCsvPath = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Kontakte-Basisverzeichnis")
-      .setDesc(
-        "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Bestehende Notizen in direkten Unterordnern werden beim Import hierher zusammengeführt."
+    new SettingGroup(containerEl)
+      .setHeading("Kontaktimport")
+      .addSetting((setting) =>
+        setting
+          .setName("CSV-Datei")
+          .setDesc("Pfad zur Kontakte-CSV, relativ zum Vault-Root.")
+          .addText((text) =>
+            text.setValue(this.plugin.settings.contactsCsvPath).onChange(async (value) => {
+              this.plugin.settings.contactsCsvPath = value;
+              await this.plugin.saveSettings();
+            })
+          )
       )
-      .addText((text) =>
-        text.setValue(this.plugin.settings.contactsBaseDir).onChange(async (value) => {
-          this.plugin.settings.contactsBaseDir = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Nur bestehende Kontakte aktualisieren")
-      .setDesc("Wenn aktiv, werden keine neuen Kontakt-Notizen angelegt, nur bestehende aktualisiert.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.contactsEditOnly).onChange(async (value) => {
-          this.plugin.settings.contactsEditOnly = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Irrelevante Kontakte überspringen")
-      .setDesc("Kontakte ohne Geburtstag und ohne Tags werden übersprungen.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.contactsFilterRelevant).onChange(async (value) => {
-          this.plugin.settings.contactsFilterRelevant = value;
-          await this.plugin.saveSettings();
-        })
+      .addSetting((setting) =>
+        setting
+          .setName("Kontakte-Basisverzeichnis")
+          .setDesc(
+            "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Bestehende Notizen in direkten Unterordnern werden beim Import hierher zusammengeführt."
+          )
+          .addText((text) =>
+            text.setValue(this.plugin.settings.contactsBaseDir).onChange(async (value) => {
+              this.plugin.settings.contactsBaseDir = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Nur bestehende Kontakte aktualisieren")
+          .setDesc("Wenn aktiv, werden keine neuen Kontakt-Notizen angelegt, nur bestehende aktualisiert.")
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.contactsEditOnly).onChange(async (value) => {
+              this.plugin.settings.contactsEditOnly = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Irrelevante Kontakte überspringen")
+          .setDesc("Kontakte ohne Geburtstag und ohne Tags werden übersprungen.")
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.contactsFilterRelevant).onChange(async (value) => {
+              this.plugin.settings.contactsFilterRelevant = value;
+              await this.plugin.saveSettings();
+            })
+          )
       );
   }
 

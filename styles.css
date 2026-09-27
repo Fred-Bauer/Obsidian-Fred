@@ -27,16 +27,10 @@
   font-weight: 600;
 }
 
-/* Header der "Important Plugin Settings" (Generell, siehe settings.js) -
-   Beschreibung + "+"-Button in einer Zeile. */
-.fred-important-plugins-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-/* Liste darunter - kuratiert (nur eingetragene, aktivierte Plugins) und
-   damit von Natur aus kurz, daher bewusst ohne Box/Scroll-Rahmen. auto-fill
+/* Liste der "Important Plugin Settings" (Generell, siehe settings.js) unter
+   der Beschreibung ihres Gruppen-Eintrags - kuratiert (nur eingetragene,
+   aktivierte Plugins) und damit von Natur aus kurz, daher bewusst ohne
+   Box/Scroll-Rahmen. auto-fill
    füllt die verfügbare Breite mit so vielen Spalten wie Platz ist (mind.
    200px je Spalte), bei schmalem Fenster/Sidebar fällt es von selbst auf
    eine Spalte zurück - kein eigener Breakpoint nötig. */
@@ -44,6 +38,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   column-gap: var(--size-4-3);
+  margin-top: var(--size-4-2);
 }
 
 /* Zeilen ebenfalls bewusst leichtgewichtig statt volle Setting-Komponenten
