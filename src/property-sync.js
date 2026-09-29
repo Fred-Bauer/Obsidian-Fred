@@ -181,11 +181,19 @@ function registerPropertyBacklinksLive(plugin) {
 
   const onMetadataChanged = (file) => {
     if (!plugin.settings.propertyBacklinksLiveEnabled) return;
+    // Der Kontakt-Import schreibt bis zu 152 Notizen am Stück; jede davon
+    // löste hier sonst einen eigenen Lauf über den gesamten Vault aus. Er
+    // pausiert deshalb und stößt zum Schluss genau einen Abgleich an.
+    if (plugin.suspendPropertyBacklinks) return;
     if (file.extension !== "md") return;
     runSync();
   };
 
   plugin.registerEvent(plugin.app.metadataCache.on("changed", onMetadataChanged));
+
+  // Damit andere Teile des Plugins (z. B. der Kontakt-Import) einen
+  // vollständigen Abgleich anstoßen können, ohne den Live-Modus zu brauchen.
+  return runSync;
 }
 
 module.exports = { syncAllLinks, registerPropertyBacklinksLive };

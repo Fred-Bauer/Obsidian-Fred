@@ -8,13 +8,13 @@ function registerCommands(plugin) {
   plugin.addCommand({
     id: "kontakte-csv-import",
     name: "KONTAKTE - Kontakte aus CSV aktualisieren",
-    callback: () => importContactsFromCsv(plugin.app, plugin.settings),
+    callback: () => importContactsFromCsv(plugin),
   });
 
   plugin.addCommand({
     id: "kontakte-unveraendert-loeschen",
     name: "KONTAKTE - Unveränderte Kontakte löschen",
-    callback: () => deleteUntouchedContacts(plugin.app, plugin.settings),
+    callback: () => deleteUntouchedContacts(plugin),
   });
 
   plugin.addCommand({

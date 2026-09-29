@@ -52,11 +52,21 @@ Einstellungen: **Generell** → *Bases*.
 
 ## KONTAKTE
 
-Import von Kontakten aus einer CSV-Datei (z. B. Google-Contacts-Export) in Notizen:
+Import von Kontakten aus einer CSV-Datei (z. B. Google-Contacts-Export) in Notizen. Der Lauf wird erst vollständig durchgerechnet und dann angewandt – dadurch sind Probelauf, Konflikt-Dialog und Lösch-Befehl alle auf denselben Soll-Zustand gestützt.
 
-- Befehl **„Kontakte aus CSV aktualisieren“** importiert/aktualisiert Kontakt-Notizen aus der konfigurierten CSV in ein Basisverzeichnis
-- Befehl **„Unveränderte Kontakte löschen“** entfernt Kontakt-Notizen, die seit dem letzten Import nicht bearbeitet wurden
-- optional: nur bestehende Kontakte aktualisieren (keine neuen anlegen), irrelevante Kontakte (ohne Geburtstag/Tags) überspringen
+- Befehl **„Kontakte aus CSV aktualisieren“** – legt neue Notizen an, aktualisiert bestehende, benennt umbenannte um und räumt verschwundene weg
+- Befehl **„Unveränderte Kontakte löschen“** – Debugging-Hilfe: entfernt Notizen, die exakt so aussehen, wie der Import sie gerade anlegen würde. Jede eigene Ergänzung (fremde Property, abweichender Wert, Fließtext) schützt eine Notiz davor
+- Fortschritt samt **Abbrechen**-Knopf in der Statusleiste; der Notice-Bereich bleibt dadurch für die Meldungen frei
+
+**Identität statt Dateiname:** Eine CSV-Zeile wird einer Notiz über Telefonnummer → E-Mail → Dateiname zugeordnet. Telefon und E-Mail stehen ohnehin in den Notizen, eine technische ID ist deshalb nicht nötig. Wird ein Kontakt in Google umbenannt, zieht die Notiz über `fileManager.renameFile` mit – eingehende `Familie`/`Freunde`-Links bleiben intakt, statt dass eine verwaiste Zweitnotiz entsteht. Gleichnamige Kontakte bekommen die letzten vier Ziffern ihrer Nummer als Zusatz (`Julian (9002)`), weil die über Läufe hinweg stabil ist; ohne Nummer und E-Mail wird der Kontakt übersprungen und gemeldet. Notizen ohne passende CSV-Zeile wandern in einen Unterordner (`_Trash`).
+
+**Zusammenspiel mit dem TYP-System:** Der Import schreibt ausschließlich über `processFrontMatter` und ruft am Ende `sortFrontmatter()` des TYP-Systems auf – er bringt also keine eigene Property-Reihenfolge mehr mit. Die Feldliste kommt aus `getTypeDefaults(TYP, { includeFloating: true })`, wird also nur dort gepflegt; ohne aktives TYP-System greift eine interne Fallback-Liste. Der TYP-Name selbst ist eine Einstellung.
+
+**Normalisierung** (abschaltbar, jede Korrektur wird gruppiert in der Konsole protokolliert): Telefonnummern auf `+49`-Format inklusive geschützter Leerzeichen, E-Mails klein, bekannte Länderkürzel ausgeschrieben, Hausnummern aus US- in deutsche Reihenfolge, `Str.` ausgeschrieben. Eine reine Umschreibung gilt dabei nie als Konflikt – sonst bliebe sie im Modus „nur Lücken füllen“ für immer liegen.
+
+**Bei abweichenden Werten** ist einstellbar, ob die CSV gewinnt, nur leere Properties gefüllt werden oder pro betroffenem Kontakt ein Dialog erscheint. Dazu zählt auch der Fall, dass ein Wert in Google gelöscht wurde: die Property wird dann geleert, im Dialog erscheint sie als „in Google gelöscht“. Geleert werden allerdings nur Properties, deren Quellspalte im CSV-Header überhaupt vorkommt – sonst würde ein knapperer Export Felder abräumen, über die er gar keine Aussage trifft. Tags werden immer zusammengeführt statt ersetzt und nie geleert.
+
+Während des Imports pausiert das Live-Property-Backlinking; zum Schluss läuft genau ein vollständiger Abgleich statt einer pro geschriebener Notiz.
 
 Einstellungen: **KONTAKTE**.
 

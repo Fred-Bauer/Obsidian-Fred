@@ -3,9 +3,16 @@ const { PluginPickerModal } = require("./important-plugins");
 
 const DEFAULT_SETTINGS = {
   contactsCsvPath: "_obsidian/data/contacts.csv",
-  contactsBaseDir: "~KONTAKTE",
+  contactsBaseDir: "~Kontakte",
+  contactsTyp: "KONTAKT",
+  contactsTrashSubdir: "_Trash",
   contactsEditOnly: false,
   contactsFilterRelevant: true,
+  contactsNormalizeEnabled: true,
+  // "csv" = CSV gewinnt, "gaps" = nur leere Properties füllen,
+  // "ask" = je betroffenem Kontakt ein Dialog.
+  contactsConflictMode: "csv",
+  contactsDryRun: false,
   databaseFoldersEnabled: true,
   databaseFolderPrefix: "~",
   folderNoteClickExtensionEnabled: true,
@@ -301,11 +308,37 @@ class FredSettingTab extends PluginSettingTab {
         setting
           .setName("Kontakte-Basisverzeichnis")
           .setDesc(
-            "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Bestehende Notizen in direkten Unterordnern werden beim Import hierher zusammengeführt."
+            "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Groß-/Kleinschreibung wird beim Abgleich ignoriert."
           )
           .addText((text) =>
             text.setValue(this.plugin.settings.contactsBaseDir).onChange(async (value) => {
               this.plugin.settings.contactsBaseDir = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("TYP der Kontakt-Notizen")
+          .setDesc(
+            "Bestimmt zugleich, aus welchem TYP-Frontmatter der Import seine Feldliste liest. Läuft das TYP-System nicht, greift eine interne Liste."
+          )
+          .addText((text) =>
+            text.setValue(this.plugin.settings.contactsTyp).onChange(async (value) => {
+              this.plugin.settings.contactsTyp = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Papierkorb-Unterordner")
+          .setDesc(
+            "Kontakte, zu denen keine CSV-Zeile mehr passt, wandern hierhin (innerhalb des Basisverzeichnisses). Eingehende Links bleiben dabei erhalten."
+          )
+          .addText((text) =>
+            text.setValue(this.plugin.settings.contactsTrashSubdir).onChange(async (value) => {
+              this.plugin.settings.contactsTrashSubdir = value;
               await this.plugin.saveSettings();
             })
           )
@@ -328,6 +361,50 @@ class FredSettingTab extends PluginSettingTab {
           .addToggle((toggle) =>
             toggle.setValue(this.plugin.settings.contactsFilterRelevant).onChange(async (value) => {
               this.plugin.settings.contactsFilterRelevant = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Werte normalisieren")
+          .setDesc(
+            "Telefonnummern auf +49-Format (inkl. geschützter Leerzeichen), E-Mails klein, Länderkürzel ausgeschrieben, Hausnummern in deutsche Reihenfolge. Jede Korrektur wird in der Konsole protokolliert."
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.contactsNormalizeEnabled).onChange(async (value) => {
+              this.plugin.settings.contactsNormalizeEnabled = value;
+              await this.plugin.saveSettings();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Bei abweichenden Werten")
+          .setDesc(
+            "Was passiert, wenn eine Notiz bereits einen anderen Wert hat als die CSV. Leere Properties werden immer gefüllt, Tags immer zusammengeführt."
+          )
+          .addDropdown((dropdown) =>
+            dropdown
+              .addOption("csv", "CSV gewinnt")
+              .addOption("gaps", "Notiz behalten, nur Lücken füllen")
+              .addOption("ask", "Pro Kontakt nachfragen")
+              .setValue(this.plugin.settings.contactsConflictMode)
+              .onChange(async (value) => {
+                this.plugin.settings.contactsConflictMode = value;
+                await this.plugin.saveSettings();
+              })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Probelauf")
+          .setDesc(
+            "Rechnet den Lauf komplett durch und meldet in der Konsole, was passieren würde - schreibt aber nichts. Gilt für beide Kontakt-Befehle."
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.contactsDryRun).onChange(async (value) => {
+              this.plugin.settings.contactsDryRun = value;
               await this.plugin.saveSettings();
             })
           )

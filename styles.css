@@ -70,3 +70,50 @@
 .fred-important-plugins-remove:hover {
   color: var(--text-error);
 }
+
+/* Fortschritt des Kontakt-Imports in der Statusleiste. Bewusst dort und
+   nicht in einer Notice, damit der Notice-Bereich für die Meldungen zu
+   Normalisierungen und Übersprungenem frei bleibt. */
+.fred-kontakt-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+
+.fred-kontakt-progress-label {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fred-kontakt-progress-cancel {
+  cursor: pointer;
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+.fred-kontakt-progress-cancel:hover {
+  color: var(--text-error);
+}
+
+.fred-kontakt-conflict .setting-item {
+  padding: var(--size-4-2) 0;
+}
+
+/* Lange Werte (E-Mails, Adressen) dürfen umbrechen statt den Dialog
+   breiter zu machen. */
+.fred-kontakt-conflict .setting-item-description {
+  overflow-wrap: anywhere;
+}
+
+/* Vier Knöpfe passen nicht in eine Zeile - umbrechen lassen, sonst
+   scrollt der Dialog waagerecht. */
+.fred-kontakt-conflict-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--size-4-2);
+}
+
+.fred-kontakt-conflict-buttons button {
+  margin: 0;
+}

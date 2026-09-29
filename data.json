@@ -1,8 +1,13 @@
 {
   "contactsCsvPath": "_obsidian/data/contacts.csv",
-  "contactsBaseDir": "~KONTAKTE",
+  "contactsBaseDir": "~Kontakte",
+  "contactsTyp": "KONTAKT",
+  "contactsTrashSubdir": "_Trash",
   "contactsEditOnly": false,
   "contactsFilterRelevant": true,
+  "contactsNormalizeEnabled": true,
+  "contactsConflictMode": "csv",
+  "contactsDryRun": false,
   "databaseFoldersEnabled": true,
   "databaseFolderPrefix": "~",
   "folderNoteClickExtensionEnabled": true,
@@ -326,7 +331,6 @@
   "graphFocusedColorEnabled": false,
   "graphFocusedColor": "",
   "importantPluginsEnabled": true,
-  "lockContactPropertiesEnabled": true,
   "autoLinkedPairs": [
     {
       "property": "Familie",

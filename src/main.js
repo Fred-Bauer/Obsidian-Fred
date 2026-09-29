@@ -14,7 +14,7 @@ module.exports = class FredPlugin extends Plugin {
     registerCommands(this);
     this.addSettingTab(new FredSettingTab(this.app, this));
     this.updateDatabaseFolderStyle = registerDatabaseFolders(this);
-    registerPropertyBacklinksLive(this);
+    this.runPropertyBacklinkSync = registerPropertyBacklinksLive(this);
     registerNestedCheckboxSync(this);
     this.refreshImportantPluginCommands = registerImportantPlugins(this);
     registerItalicUnderscore(this);

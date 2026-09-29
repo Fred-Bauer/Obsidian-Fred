@@ -94,9 +94,16 @@ var require_settings = __commonJS({
     var { PluginPickerModal } = require_important_plugins();
     var DEFAULT_SETTINGS2 = {
       contactsCsvPath: "_obsidian/data/contacts.csv",
-      contactsBaseDir: "~KONTAKTE",
+      contactsBaseDir: "~Kontakte",
+      contactsTyp: "KONTAKT",
+      contactsTrashSubdir: "_Trash",
       contactsEditOnly: false,
       contactsFilterRelevant: true,
+      contactsNormalizeEnabled: true,
+      // "csv" = CSV gewinnt, "gaps" = nur leere Properties füllen,
+      // "ask" = je betroffenem Kontakt ein Dialog.
+      contactsConflictMode: "csv",
+      contactsDryRun: false,
       databaseFoldersEnabled: true,
       databaseFolderPrefix: "~",
       folderNoteClickExtensionEnabled: true,
@@ -300,10 +307,28 @@ var require_settings = __commonJS({
           )
         ).addSetting(
           (setting) => setting.setName("Kontakte-Basisverzeichnis").setDesc(
-            "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Bestehende Notizen in direkten Unterordnern werden beim Import hierher zusammengef\xFChrt."
+            "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Gro\xDF-/Kleinschreibung wird beim Abgleich ignoriert."
           ).addText(
             (text) => text.setValue(this.plugin.settings.contactsBaseDir).onChange(async (value) => {
               this.plugin.settings.contactsBaseDir = value;
+              await this.plugin.saveSettings();
+            })
+          )
+        ).addSetting(
+          (setting) => setting.setName("TYP der Kontakt-Notizen").setDesc(
+            "Bestimmt zugleich, aus welchem TYP-Frontmatter der Import seine Feldliste liest. L\xE4uft das TYP-System nicht, greift eine interne Liste."
+          ).addText(
+            (text) => text.setValue(this.plugin.settings.contactsTyp).onChange(async (value) => {
+              this.plugin.settings.contactsTyp = value;
+              await this.plugin.saveSettings();
+            })
+          )
+        ).addSetting(
+          (setting) => setting.setName("Papierkorb-Unterordner").setDesc(
+            "Kontakte, zu denen keine CSV-Zeile mehr passt, wandern hierhin (innerhalb des Basisverzeichnisses). Eingehende Links bleiben dabei erhalten."
+          ).addText(
+            (text) => text.setValue(this.plugin.settings.contactsTrashSubdir).onChange(async (value) => {
+              this.plugin.settings.contactsTrashSubdir = value;
               await this.plugin.saveSettings();
             })
           )
@@ -321,6 +346,33 @@ var require_settings = __commonJS({
               await this.plugin.saveSettings();
             })
           )
+        ).addSetting(
+          (setting) => setting.setName("Werte normalisieren").setDesc(
+            "Telefonnummern auf +49-Format (inkl. gesch\xFCtzter Leerzeichen), E-Mails klein, L\xE4nderk\xFCrzel ausgeschrieben, Hausnummern in deutsche Reihenfolge. Jede Korrektur wird in der Konsole protokolliert."
+          ).addToggle(
+            (toggle) => toggle.setValue(this.plugin.settings.contactsNormalizeEnabled).onChange(async (value) => {
+              this.plugin.settings.contactsNormalizeEnabled = value;
+              await this.plugin.saveSettings();
+            })
+          )
+        ).addSetting(
+          (setting) => setting.setName("Bei abweichenden Werten").setDesc(
+            "Was passiert, wenn eine Notiz bereits einen anderen Wert hat als die CSV. Leere Properties werden immer gef\xFCllt, Tags immer zusammengef\xFChrt."
+          ).addDropdown(
+            (dropdown) => dropdown.addOption("csv", "CSV gewinnt").addOption("gaps", "Notiz behalten, nur L\xFCcken f\xFCllen").addOption("ask", "Pro Kontakt nachfragen").setValue(this.plugin.settings.contactsConflictMode).onChange(async (value) => {
+              this.plugin.settings.contactsConflictMode = value;
+              await this.plugin.saveSettings();
+            })
+          )
+        ).addSetting(
+          (setting) => setting.setName("Probelauf").setDesc(
+            "Rechnet den Lauf komplett durch und meldet in der Konsole, was passieren w\xFCrde - schreibt aber nichts. Gilt f\xFCr beide Kontakt-Befehle."
+          ).addToggle(
+            (toggle) => toggle.setValue(this.plugin.settings.contactsDryRun).onChange(async (value) => {
+              this.plugin.settings.contactsDryRun = value;
+              await this.plugin.saveSettings();
+            })
+          )
         );
       }
       displayMediaTab(containerEl) {
@@ -334,36 +386,104 @@ var require_settings = __commonJS({
 // src/kontakt-import.js
 var require_kontakt_import = __commonJS({
   "src/kontakt-import.js"(exports2, module2) {
-    var { Notice, parseYaml, stringifyYaml } = require("obsidian");
-    var CONTACTS_COLUMNS = [
-      "Labels",
-      "First Name",
-      "Middle Name",
-      "Last Name",
-      "Birthday",
-      "E-mail 1 - Value",
-      "Phone 1 - Value",
-      "Address 1 - Street",
-      "Address 1 - City",
-      "Address 1 - Postal Code",
-      "Address 1 - Country"
-    ];
-    var CONTACTS_FIELD_MAPPING = {
-      "Labels": "tags",
+    var { Notice, Modal, Setting, ButtonComponent } = require("obsidian");
+    var MULTI_VALUE_SEPARATOR = " ::: ";
+    var IGNORED_LABELS = /* @__PURE__ */ new Set(["* myContacts", "* starred"]);
+    var STARRED_LABEL = "* starred";
+    var COLUMN_MAPPING = {
       "First Name": "Vorname",
       "Middle Name": "Zweitname",
       "Last Name": "Nachname",
       "Birthday": "Geburtstag",
-      "Phone 1 - Value": "Handynummer",
-      "E-mail 1 - Value": "E-Mail",
-      "E-mail 2 - Value": "E-Mail-Alt",
       "Address 1 - Street": "Strasse",
-      "Address 1 - Postal Code": "Plz",
       "Address 1 - City": "Stadt",
+      "Address 1 - Postal Code": "Plz",
       "Address 1 - Country": "Nation"
     };
+    var FALLBACK_CONTACT_KEYS = [
+      "Vorname",
+      "Zweitname",
+      "Nachname",
+      "Geburtstag",
+      "Handynummer",
+      "Handynummer-Alt",
+      "Festnetz",
+      "E-Mail",
+      "E-Mail-Alt",
+      "Strasse",
+      "Stadt",
+      "Plz",
+      "Nation",
+      "Familie",
+      "Freunde"
+    ];
+    var IMPORT_OWNED_KEYS = [
+      "Vorname",
+      "Zweitname",
+      "Nachname",
+      "Geburtstag",
+      "Handynummer",
+      "Handynummer-Alt",
+      "Festnetz",
+      "E-Mail",
+      "E-Mail-Alt",
+      "Strasse",
+      "Stadt",
+      "Plz",
+      "Nation",
+      "tags"
+    ];
+    var SOURCE_COLUMNS = {
+      Vorname: ["First Name"],
+      Zweitname: ["Middle Name"],
+      Nachname: ["Last Name"],
+      Geburtstag: ["Birthday"],
+      Handynummer: ["Phone 1 - Value"],
+      "Handynummer-Alt": ["Phone 1 - Value"],
+      Festnetz: ["Phone 2 - Value"],
+      "E-Mail": ["E-mail 1 - Value"],
+      "E-Mail-Alt": ["E-mail 2 - Value", "E-mail 3 - Value"],
+      Strasse: ["Address 1 - Street"],
+      Stadt: ["Address 1 - City"],
+      Plz: ["Address 1 - Postal Code"],
+      Nation: ["Address 1 - Country"],
+      tags: ["Labels"]
+    };
+    var COUNTRY_NAMES = {
+      DE: "Deutschland",
+      AT: "\xD6sterreich",
+      CH: "Schweiz",
+      FR: "Frankreich",
+      NL: "Niederlande",
+      BE: "Belgien",
+      LU: "Luxemburg",
+      IT: "Italien",
+      ES: "Spanien",
+      PL: "Polen",
+      CZ: "Tschechien",
+      DK: "D\xE4nemark",
+      GB: "Vereinigtes K\xF6nigreich",
+      US: "USA",
+      TR: "T\xFCrkei"
+    };
     function joinVaultPath(...parts) {
-      return parts.filter((part) => part !== void 0 && part !== "").join("/").replace(/\/+/g, "/").replace(/\/$/, "");
+      return parts.filter((part) => part !== void 0 && part !== null && part !== "").join("/").replace(/\/+/g, "/").replace(/\/$/, "");
+    }
+    function isInFolder(path, folder) {
+      const p = path.toLowerCase();
+      const f = folder.toLowerCase();
+      return p === f || p.startsWith(f + "/");
+    }
+    function resolveFolderPath(app, folder) {
+      if (app.vault.getAbstractFileByPath(folder)) return folder;
+      const lower = folder.toLowerCase();
+      for (const item of app.vault.getAllLoadedFiles?.() ?? []) {
+        if (item.children && item.path.toLowerCase() === lower) return item.path;
+      }
+      return folder;
+    }
+    function sanitizeFileName(name) {
+      return name.replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim();
     }
     function parseCsv(text) {
       const rows = [];
@@ -421,7 +541,7 @@ var require_kontakt_import = __commonJS({
       return rows.filter((r) => !(r.length === 1 && r[0] === ""));
     }
     function csvToObjects(text) {
-      const rows = parseCsv(text);
+      const rows = parseCsv(text.replace(/^﻿/, ""));
       if (rows.length === 0) return [];
       const header = rows[0];
       return rows.slice(1).map((row) => {
@@ -430,195 +550,638 @@ var require_kontakt_import = __commonJS({
         return obj;
       });
     }
-    function processContactRow(row, firstNameColumn = "First Name", lastNameColumn = "Last Name") {
-      const firstName = (row[firstNameColumn] || "").trim();
-      const lastName = (row[lastNameColumn] || "").trim();
-      let baseName;
+    function splitMulti(value) {
+      return String(value ?? "").split(MULTI_VALUE_SEPARATOR).map((part) => part.trim()).filter(Boolean);
+    }
+    function normalizePhone(raw) {
+      let phone = String(raw ?? "").replace(/[\s   ()/.-]/g, "");
+      if (!phone) return "";
+      if (phone.startsWith("00")) phone = "+" + phone.slice(2);
+      else if (phone.startsWith("0")) phone = "+49" + phone.slice(1);
+      return phone.replace(/^\+490/, "+49");
+    }
+    function normalizeEmail(raw) {
+      return String(raw ?? "").trim().toLowerCase();
+    }
+    function normalizeCountry(raw) {
+      const value = String(raw ?? "").trim();
+      return COUNTRY_NAMES[value.toUpperCase()] ?? value;
+    }
+    function normalizeStreet(raw) {
+      let street = String(raw ?? "").trim().replace(/\s+/g, " ");
+      if (!street) return "";
+      street = street.replace(/([a-zäöüß])str\.?(?=\s|$)/g, "$1stra\xDFe");
+      street = street.replace(/\bStr\.?(?=\s|$)/g, "Stra\xDFe");
+      const usOrder = street.match(/^(\d+\s?[a-zA-Z]?)\s+(\D.*)$/);
+      if (usOrder) street = `${usOrder[2].trim()} ${usOrder[1].replace(/\s/g, "")}`;
+      return street;
+    }
+    function normalizeBirthday(raw) {
+      const value = String(raw ?? "").trim();
+      return value.startsWith("--") ? "0001" + value.slice(1) : value;
+    }
+    function normalizeTag(raw) {
+      return String(raw ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+    }
+    function collectPhones(row) {
+      const mobile = [];
+      const landline = [];
+      for (const value of splitMulti(row["Phone 1 - Value"])) {
+        const phone = normalizePhone(value);
+        if (phone && !mobile.includes(phone)) mobile.push(phone);
+      }
+      for (const value of splitMulti(row["Phone 2 - Value"])) {
+        const phone = normalizePhone(value);
+        if (phone && !mobile.includes(phone) && !landline.includes(phone)) landline.push(phone);
+      }
+      return { mobile, landline };
+    }
+    function collectEmails(row) {
+      const emails = [];
+      for (const column of ["E-mail 1 - Value", "E-mail 2 - Value", "E-mail 3 - Value"]) {
+        for (const value of splitMulti(row[column])) {
+          const email = normalizeEmail(value);
+          if (email && !emails.includes(email)) emails.push(email);
+        }
+      }
+      return emails;
+    }
+    function collectTags(row) {
+      const labels = splitMulti(row["Labels"]);
+      const tags = [];
+      for (const label of labels) {
+        if (IGNORED_LABELS.has(label)) continue;
+        const tag = normalizeTag(label);
+        if (tag && !tags.includes(tag)) tags.push(tag);
+      }
+      if (labels.includes(STARRED_LABEL) && !tags.includes("favorit")) tags.push("favorit");
+      return tags;
+    }
+    function noteCorrection(corrections, name, field, from, to) {
+      if (from === to || !from) return;
+      corrections.push({ name, field, from, to });
+    }
+    function buildContact(row, corrections, normalize) {
+      const firstName = (row["First Name"] || "").trim();
+      const lastName = (row["Last Name"] || "").trim();
+      let baseName = "";
       if (firstName && lastName) baseName = `${firstName} ${lastName}`;
       else if (firstName || lastName) baseName = firstName || lastName;
-      else baseName = "_noname";
       const data = {};
-      for (const [key, value] of Object.entries(row)) {
-        if (CONTACTS_COLUMNS.includes(key) && value.trim()) {
-          data[CONTACTS_FIELD_MAPPING[key] || key] = value.trim();
-        }
+      for (const [column, key] of Object.entries(COLUMN_MAPPING)) {
+        const raw = (row[column] || "").trim();
+        if (!raw) continue;
+        let value = raw;
+        if (key === "Geburtstag") value = normalizeBirthday(raw);
+        else if (normalize && key === "Nation") value = normalizeCountry(raw);
+        else if (normalize && key === "Strasse") value = normalizeStreet(raw);
+        noteCorrection(corrections, baseName, key, raw, value);
+        data[key] = value;
       }
-      return { baseName, data };
+      const { mobile, landline } = collectPhones(row);
+      if (mobile[0]) {
+        noteCorrection(corrections, baseName, "Handynummer", splitMulti(row["Phone 1 - Value"])[0] ?? "", mobile[0]);
+        data["Handynummer"] = mobile[0];
+      }
+      if (mobile.length > 1) data["Handynummer-Alt"] = mobile.length === 2 ? mobile[1] : mobile.slice(1);
+      if (landline.length > 0) data["Festnetz"] = landline.length === 1 ? landline[0] : landline;
+      const emails = collectEmails(row);
+      if (emails[0]) {
+        if (normalize) noteCorrection(corrections, baseName, "E-Mail", splitMulti(row["E-mail 1 - Value"])[0] ?? "", emails[0]);
+        data["E-Mail"] = emails[0];
+      }
+      if (emails.length > 1) data["E-Mail-Alt"] = emails.length === 2 ? emails[1] : emails.slice(1);
+      const tags = collectTags(row);
+      if (tags.length > 0) data["tags"] = tags;
+      return {
+        baseName,
+        data,
+        phones: [...mobile, ...landline],
+        emails,
+        body: (row["Notes"] || "").trim()
+      };
     }
-    function transformContactFields(data, existingTags, starred) {
-      const transformed = { ...data };
-      try {
-        if ("Geburtstag" in transformed) {
-          const geburtstag = transformed.Geburtstag;
-          if (geburtstag.startsWith("--")) {
-            transformed.Geburtstag = "0001" + geburtstag.slice(1);
+    function isRelevant(contact) {
+      return Boolean(contact.data.Geburtstag) || (contact.data.tags?.length ?? 0) > 0;
+    }
+    function getTypSystem(app) {
+      return app.plugins.plugins["typ-system"] ?? null;
+    }
+    function contactPropertyKeys(app, typ) {
+      const defaults = getTypSystem(app)?.getTypeDefaults?.(typ, { includeFloating: true });
+      const keys = defaults ? Object.keys(defaults) : null;
+      return keys && keys.length > 0 ? keys : FALLBACK_CONTACT_KEYS;
+    }
+    function toArray(value) {
+      if (Array.isArray(value)) return value;
+      if (value === void 0 || value === null || value === "") return [];
+      return [value];
+    }
+    function buildNoteIndex(app, baseDir, typ) {
+      const byPhone = /* @__PURE__ */ new Map();
+      const byEmail = /* @__PURE__ */ new Map();
+      const byName = /* @__PURE__ */ new Map();
+      const notes = [];
+      for (const file of app.vault.getMarkdownFiles()) {
+        if (!isInFolder(file.path, baseDir)) continue;
+        const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+        if (String(frontmatter.TYP ?? frontmatter.typ ?? "") !== typ) continue;
+        const entry = { file, frontmatter };
+        notes.push(entry);
+        for (const key of ["Handynummer", "Handynummer-Alt", "Festnetz"]) {
+          for (const value of toArray(frontmatter[key])) {
+            const phone = normalizePhone(value);
+            if (phone && !byPhone.has(phone)) byPhone.set(phone, entry);
           }
         }
-        if ("Handynummer" in transformed) {
-          let phone = transformed.Handynummer.trim();
-          if (phone.includes(" ::: ")) phone = phone.split(" ::: ")[0];
-          transformed.Handynummer = phone.replace(/ /g, "").replace(/-/g, "");
-        }
-        let normalizedExisting = existingTags;
-        if (typeof normalizedExisting === "string") normalizedExisting = [normalizedExisting];
-        if (!Array.isArray(normalizedExisting)) normalizedExisting = [];
-        const hasExisting = normalizedExisting.length > 0;
-        if ("tags" in transformed || starred) {
-          const newTags = (transformed.tags || "").split(" ::: ").filter((tag) => tag && tag !== "* myContacts" && tag !== "* starred").map((tag) => tag.toLowerCase().replace(/ /g, "_"));
-          if (starred) newTags.push("favorit");
-          const hasNew = newTags.length > 0;
-          if (hasExisting && hasNew) {
-            transformed.tags = [.../* @__PURE__ */ new Set([...newTags, ...normalizedExisting])];
-          } else if (hasExisting) {
-            transformed.tags = [...new Set(normalizedExisting)];
-          } else if (hasNew) {
-            transformed.tags = newTags;
-          } else {
-            delete transformed.tags;
+        for (const key of ["E-Mail", "E-Mail-Alt"]) {
+          for (const value of toArray(frontmatter[key])) {
+            const email = normalizeEmail(value);
+            if (email && !byEmail.has(email)) byEmail.set(email, entry);
           }
         }
-      } catch (e) {
-        console.error("[Kontakt-Import] Fehler bei der Daten-Transformation:", e);
+        const name = file.basename.toLowerCase();
+        if (!byName.has(name)) byName.set(name, entry);
       }
-      return transformed;
+      return { byPhone, byEmail, byName, notes };
     }
-    function isStarredContact(rawTags) {
-      if (!rawTags) return false;
-      return rawTags.split(" ::: ").map((tag) => tag.trim()).includes("* starred");
+    function matchNote(index, contact, taken) {
+      for (const phone of contact.phones) {
+        const hit2 = index.byPhone.get(phone);
+        if (hit2 && !taken.has(hit2.file.path)) return { entry: hit2, via: "Telefon" };
+      }
+      for (const email of contact.emails) {
+        const hit2 = index.byEmail.get(email);
+        if (hit2 && !taken.has(hit2.file.path)) return { entry: hit2, via: "E-Mail" };
+      }
+      const hit = index.byName.get(contact.baseName.toLowerCase());
+      if (hit && !taken.has(hit.file.path)) return { entry: hit, via: "Name" };
+      return null;
     }
-    async function findExistingContactFile(adapter, baseName, searchDirs) {
-      for (const dir of searchDirs) {
-        const path = joinVaultPath(dir, `${baseName}.md`);
-        if (await adapter.exists(path)) return path;
+    function uniqueSuffix(contact) {
+      const phone = contact.phones[0];
+      if (phone && phone.length >= 4) return phone.slice(-4);
+      const email = contact.emails[0];
+      if (email) {
+        const local = email.split("@")[0].replace(/[^\p{L}\p{N}]/gu, "");
+        if (local.length >= 4) return local.slice(-4);
       }
       return null;
     }
-    async function readContactFrontmatter(adapter, path) {
-      const raw = await adapter.read(path);
-      const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-      if (!match) return { frontmatter: {}, content: raw };
-      return { frontmatter: parseYaml(match[1]) || {}, content: raw.slice(match[0].length) };
-    }
-    async function writeContactFile(adapter, path, frontmatter, content) {
-      const ordered = { TYP: "KONTAKT" };
-      if ("aliases" in frontmatter) ordered.aliases = frontmatter.aliases;
-      if ("tags" in frontmatter) ordered.tags = frontmatter.tags;
-      for (const [key, value] of Object.entries(frontmatter)) {
-        if (!(key in ordered)) ordered[key] = value;
+    function assignFileNames(contacts, skipped) {
+      const byName = /* @__PURE__ */ new Map();
+      for (const contact of contacts) {
+        const key = contact.baseName.toLowerCase();
+        if (!byName.has(key)) byName.set(key, []);
+        byName.get(key).push(contact);
       }
-      const fileContent = `---
-${stringifyYaml(ordered)}---
-${content}`;
-      const dir = path.split("/").slice(0, -1).join("/");
-      if (dir && !await adapter.exists(dir)) await adapter.mkdir(dir);
-      await adapter.write(path, fileContent);
-    }
-    var AUTO_MANAGED_FRONTMATTER_KEYS = /* @__PURE__ */ new Set([
-      "cssclasses",
-      "TYP",
-      "aliases",
-      "tags",
-      ...Object.values(CONTACTS_FIELD_MAPPING)
-    ]);
-    function isUntouchedContact(frontmatter, content) {
-      if (content.trim().length > 0) return false;
-      return Object.keys(frontmatter).every((key) => AUTO_MANAGED_FRONTMATTER_KEYS.has(key));
-    }
-    async function safeRemoveContactFile(adapter, path) {
-      try {
-        const trashedToSystem = await adapter.trashSystem(path);
-        if (!trashedToSystem) await adapter.trashLocal(path);
-      } catch (e) {
-        await adapter.remove(path);
-      }
-    }
-    async function importContactsFromCsv(app, settings) {
-      const { adapter } = app.vault;
-      const csvPath = settings.contactsCsvPath;
-      const basisVerzeichnis = settings.contactsBaseDir.replace(/\/$/, "");
-      if (!await adapter.exists(csvPath)) {
-        new Notice(`Kontakt-Import: Datei nicht gefunden: ${csvPath}`);
-        return;
-      }
-      if (!await adapter.exists(basisVerzeichnis)) {
-        new Notice(`Kontakt-Import: Basisverzeichnis nicht gefunden: ${basisVerzeichnis}`);
-        return;
-      }
-      const { folders } = await adapter.list(basisVerzeichnis);
-      const searchDirs = [basisVerzeichnis, ...folders.sort()];
-      const rows = csvToObjects(await adapter.read(csvPath));
-      let created = 0;
-      let updated = 0;
-      let moved = 0;
-      let skipped = 0;
-      let errors = 0;
-      for (const row of rows) {
-        try {
-          const { baseName, data: rawData } = processContactRow(row);
-          const starred = isStarredContact(rawData.tags);
-          const existingFile = await findExistingContactFile(adapter, baseName, searchDirs);
-          if (existingFile) {
-            const { frontmatter: existingFrontmatter, content } = await readContactFrontmatter(adapter, existingFile);
-            const newData = transformContactFields(rawData, existingFrontmatter.tags, starred);
-            if (settings.contactsFilterRelevant && !newData.Geburtstag && (!newData.tags || newData.tags.length < 1)) {
-              skipped++;
-              continue;
-            }
-            const updatedFrontmatter = { ...existingFrontmatter, ...newData };
-            const targetPath = joinVaultPath(basisVerzeichnis, `${baseName}.md`);
-            await writeContactFile(adapter, targetPath, updatedFrontmatter, content);
-            if (targetPath !== existingFile) {
-              await safeRemoveContactFile(adapter, existingFile);
-              moved++;
-            } else {
-              updated++;
-            }
-          } else if (!settings.contactsEditOnly) {
-            const newData = transformContactFields(rawData, void 0, starred);
-            if (settings.contactsFilterRelevant && !newData.Geburtstag && (!newData.tags || newData.tags.length < 1)) {
-              skipped++;
-              continue;
-            }
-            const newPath = joinVaultPath(basisVerzeichnis, `${baseName}.md`);
-            await writeContactFile(adapter, newPath, newData, "");
-            created++;
+      const result = [];
+      for (const group of byName.values()) {
+        if (group.length === 1) {
+          group[0].fileName = sanitizeFileName(group[0].baseName);
+          result.push(group[0]);
+          continue;
+        }
+        const used = /* @__PURE__ */ new Set();
+        for (const contact of group) {
+          const suffix = uniqueSuffix(contact);
+          if (!suffix || used.has(suffix)) {
+            skipped.push({
+              name: contact.baseName,
+              reason: suffix ? "gleicher Namenszusatz wie ein anderer Kontakt" : "Namensgleichheit ohne Nummer oder E-Mail"
+            });
+            continue;
           }
-        } catch (e) {
-          errors++;
-          console.error("[Kontakt-Import] Fehler bei Kontakt-Zeile:", row, e);
+          used.add(suffix);
+          contact.fileName = sanitizeFileName(`${contact.baseName} (${suffix})`);
+          result.push(contact);
         }
       }
-      const summary = `Kontakt-Import: ${created} neu, ${updated} aktualisiert, ${moved} aus Unterordnern zusammengef\xFChrt, ${skipped} \xFCbersprungen${errors ? `, ${errors} Fehler (siehe Konsole)` : ""}.`;
-      console.log("[Kontakt-Import]", summary);
-      new Notice(summary);
+      return result;
     }
-    async function deleteUntouchedContacts(app, settings) {
+    function valuesEqual(a, b) {
+      if (Array.isArray(a) || Array.isArray(b)) {
+        const x = toArray(a).map(String);
+        const y = toArray(b).map(String);
+        return x.length === y.length && x.every((v, i) => v === y[i]);
+      }
+      if (a === void 0 || a === null || a === "") return b === void 0 || b === null || b === "";
+      return String(a) === String(b);
+    }
+    function mergeTags(existing, incoming) {
+      return [.../* @__PURE__ */ new Set([...toArray(incoming).map(String), ...toArray(existing).map(String)])];
+    }
+    function buildChanges(contact, frontmatter, ownedKeys, removableKeys) {
+      const changes = [];
+      for (const key of ownedKeys) {
+        let value = contact.data[key];
+        if (key === "tags") {
+          if (value === void 0 && toArray(frontmatter.tags).length === 0) continue;
+          value = mergeTags(frontmatter.tags, value);
+        }
+        if (value === void 0) {
+          const existing = frontmatter[key];
+          const hasExisting = !(existing === void 0 || existing === null || existing === "" || toArray(existing).length === 0);
+          if (!hasExisting || !removableKeys?.has(key)) continue;
+          changes.push({ key, from: existing, to: void 0 });
+          continue;
+        }
+        if (valuesEqual(frontmatter[key], value)) continue;
+        changes.push({ key, from: frontmatter[key], to: value });
+      }
+      return changes;
+    }
+    function canonicalValue(key, value) {
+      const parts = toArray(value).map(String);
+      if (key === "Handynummer" || key === "Handynummer-Alt" || key === "Festnetz") {
+        return parts.map(normalizePhone).join("|");
+      }
+      if (key === "E-Mail" || key === "E-Mail-Alt") return parts.map(normalizeEmail).join("|");
+      if (key === "Nation") return parts.map(normalizeCountry).join("|");
+      if (key === "Strasse") return parts.map(normalizeStreet).join("|");
+      return parts.join("|");
+    }
+    function splitChanges(changes, frontmatter) {
+      const plain = [];
+      const conflicts = [];
+      for (const change of changes) {
+        const existing = frontmatter[change.key];
+        const isEmpty = existing === void 0 || existing === null || existing === "" || toArray(existing).length === 0;
+        const sameValue = canonicalValue(change.key, existing) === canonicalValue(change.key, change.to);
+        if (isEmpty || sameValue || change.key === "tags") plain.push(change);
+        else conflicts.push(change);
+      }
+      return { changes: plain, conflicts };
+    }
+    async function buildPlan(plugin) {
+      const { app, settings } = plugin;
       const { adapter } = app.vault;
-      const basisVerzeichnis = settings.contactsBaseDir.replace(/\/$/, "");
-      if (!await adapter.exists(basisVerzeichnis)) {
-        new Notice(`Kontakt-Import: Basisverzeichnis nicht gefunden: ${basisVerzeichnis}`);
+      const csvPath = settings.contactsCsvPath;
+      const configuredDir = settings.contactsBaseDir.replace(/\/$/, "");
+      const typ = settings.contactsTyp || "KONTAKT";
+      if (!await adapter.exists(csvPath)) throw new Error(`Datei nicht gefunden: ${csvPath}`);
+      if (!await adapter.exists(configuredDir)) throw new Error(`Basisverzeichnis nicht gefunden: ${configuredDir}`);
+      const baseDir = resolveFolderPath(app, configuredDir);
+      const trashDir = joinVaultPath(baseDir, settings.contactsTrashSubdir || "_Trash");
+      const corrections = [];
+      const skipped = [];
+      const normalize = settings.contactsNormalizeEnabled !== false;
+      const rows = csvToObjects(await adapter.read(csvPath));
+      let contacts = [];
+      for (const row of rows) {
+        const contact = buildContact(row, corrections, normalize);
+        if (!contact.baseName) {
+          skipped.push({ name: "(ohne Namen)", reason: "weder Vor- noch Nachname" });
+          continue;
+        }
+        if (settings.contactsFilterRelevant && !isRelevant(contact)) continue;
+        contacts.push(contact);
+      }
+      contacts = assignFileNames(contacts, skipped);
+      const index = buildNoteIndex(app, baseDir, typ);
+      const typKeys = contactPropertyKeys(app, typ);
+      const ownedKeys = new Set(IMPORT_OWNED_KEYS.filter((key) => key === "tags" || typKeys.includes(key)));
+      const header = new Set(rows.length > 0 ? Object.keys(rows[0]) : []);
+      const removableKeys = new Set(
+        [...ownedKeys].filter((key) => key !== "tags" && (SOURCE_COLUMNS[key] ?? []).some((column) => header.has(column)))
+      );
+      const actions = [];
+      const taken = /* @__PURE__ */ new Set();
+      for (const contact of contacts) {
+        const match = matchNote(index, contact, taken);
+        const targetPath = joinVaultPath(baseDir, `${contact.fileName}.md`);
+        if (!match) {
+          if (settings.contactsEditOnly) {
+            skipped.push({ name: contact.baseName, reason: "neu, aber \u201ENur bestehende aktualisieren\u201C ist aktiv" });
+            continue;
+          }
+          actions.push({
+            kind: "create",
+            contact,
+            targetPath,
+            changes: buildChanges(contact, {}, ownedKeys, removableKeys),
+            conflicts: []
+          });
+          continue;
+        }
+        taken.add(match.entry.file.path);
+        const split = splitChanges(
+          buildChanges(contact, match.entry.frontmatter, ownedKeys, removableKeys),
+          match.entry.frontmatter
+        );
+        const rename = match.entry.file.path !== targetPath ? targetPath : null;
+        if (split.changes.length === 0 && split.conflicts.length === 0 && !rename) continue;
+        actions.push({
+          kind: "update",
+          contact,
+          file: match.entry.file,
+          via: match.via,
+          targetPath,
+          rename,
+          changes: split.changes,
+          conflicts: split.conflicts
+        });
+      }
+      const orphans = index.notes.filter((entry) => !taken.has(entry.file.path) && !isInFolder(entry.file.path, trashDir));
+      return { typ, baseDir, trashDir, contacts, actions, orphans, corrections, skipped, ownedKeys };
+    }
+    function formatValue(value) {
+      if (value === void 0 || value === null || value === "") return "\u2014";
+      return Array.isArray(value) ? value.join(", ") : String(value);
+    }
+    var ConflictModal = class extends Modal {
+      constructor(app, action, resolve) {
+        super(app);
+        this.action = action;
+        this.resolve = resolve;
+        this.accepted = new Set(action.conflicts.map((c) => c.key));
+        this.answered = false;
+      }
+      onOpen() {
+        const { contentEl, action } = this;
+        contentEl.addClass("fred-kontakt-conflict");
+        contentEl.createEl("h3", { text: action.contact.baseName });
+        contentEl.createEl("p", {
+          cls: "setting-item-description",
+          text: `${action.conflicts.length} abweichende ${action.conflicts.length === 1 ? "Property" : "Properties"}. Angehakt wird der CSV-Wert \xFCbernommen.`
+        });
+        for (const conflict of action.conflicts) {
+          const isRemoval = conflict.to === void 0;
+          new Setting(contentEl).setName(conflict.key + (isRemoval ? "  (in Google gel\xF6scht)" : "")).setDesc(
+            isRemoval ? `Notiz: ${formatValue(conflict.from)}   \u2192   aus der Notiz entfernen` : `Notiz: ${formatValue(conflict.from)}   \u2192   CSV: ${formatValue(conflict.to)}`
+          ).addToggle(
+            (toggle) => toggle.setValue(true).onChange((value) => {
+              if (value) this.accepted.add(conflict.key);
+              else this.accepted.delete(conflict.key);
+            })
+          );
+        }
+        const footer = contentEl.createDiv({ cls: "modal-button-container fred-kontakt-conflict-buttons" });
+        const button = (text, cta, onClick) => {
+          const btn = new ButtonComponent(footer).setButtonText(text).onClick(onClick);
+          if (cta) btn.setCta();
+          return btn;
+        };
+        button("\xDCbernehmen", true, () => this.finish({ accepted: this.accepted }));
+        button("Notiz behalten", false, () => this.finish({ accepted: /* @__PURE__ */ new Set() }));
+        button("Rest: CSV", false, () => this.finish({ accepted: this.accepted, restMode: "csv" }));
+        button("Rest: Notiz", false, () => this.finish({ accepted: /* @__PURE__ */ new Set(), restMode: "gaps" }));
+      }
+      finish(result) {
+        this.answered = true;
+        this.resolve(result);
+        this.close();
+      }
+      onClose() {
+        this.contentEl.empty();
+        if (!this.answered) this.resolve({ accepted: /* @__PURE__ */ new Set() });
+      }
+    };
+    function askConflicts(app, action) {
+      return new Promise((resolve) => new ConflictModal(app, action, resolve).open());
+    }
+    async function resolveConflicts(plugin, actions) {
+      let mode = plugin.settings.contactsConflictMode || "csv";
+      for (const action of actions) {
+        if (action.conflicts.length === 0) continue;
+        if (mode === "csv") {
+          action.changes.push(...action.conflicts);
+        } else if (mode === "ask") {
+          const { accepted, restMode } = await askConflicts(plugin.app, action);
+          action.changes.push(...action.conflicts.filter((c) => accepted.has(c.key)));
+          if (restMode) mode = restMode;
+        }
+        action.conflicts = [];
+      }
+    }
+    function createProgress(plugin, total) {
+      const el = plugin.addStatusBarItem();
+      el.addClass("fred-kontakt-progress");
+      const label = el.createSpan({ cls: "fred-kontakt-progress-label" });
+      const cancelBtn = el.createEl("span", { cls: "fred-kontakt-progress-cancel", text: "Abbrechen" });
+      const state = {
+        cancelled: false,
+        update(done, name) {
+          const width = 12;
+          const filled = total > 0 ? Math.round(width * done / total) : width;
+          const bar = "\u2588".repeat(filled) + "\u2591".repeat(Math.max(0, width - filled));
+          label.setText(`Kontakte ${bar} ${done}/${total}${name ? "  \xB7  " + name : ""}`);
+        },
+        finish() {
+          el.remove();
+        }
+      };
+      cancelBtn.addEventListener("click", () => {
+        state.cancelled = true;
+        cancelBtn.setText("wird abgebrochen \u2026");
+      });
+      state.update(0, "");
+      return state;
+    }
+    async function writeFrontmatter(app, file, changes, typ) {
+      const typSystem = getTypSystem(app);
+      await app.fileManager.processFrontMatter(file, (frontmatter) => {
+        if (typSystem?.applyTypeProperties) typSystem.applyTypeProperties(frontmatter, typ, null);
+        else frontmatter.TYP = typ;
+        for (const change of changes) {
+          if (change.to === void 0 || change.to === null || change.to === "") delete frontmatter[change.key];
+          else frontmatter[change.key] = change.to;
+        }
+        typSystem?.sortFrontmatter?.(frontmatter, typ, null);
+      });
+    }
+    async function ensureFolder(app, path) {
+      if (!path) return;
+      if (!await app.vault.adapter.exists(path)) await app.vault.createFolder(path).catch(() => {
+      });
+    }
+    async function applyPlan(plugin, plan, progress) {
+      const { app } = plugin;
+      const stats = { created: 0, updated: 0, renamed: 0, trashed: 0, errors: 0 };
+      const total = plan.actions.length + plan.orphans.length;
+      let done = 0;
+      for (const action of plan.actions) {
+        if (progress?.cancelled) break;
+        done++;
+        progress?.update(done, action.contact.baseName);
+        try {
+          if (action.kind === "create") {
+            await ensureFolder(app, plan.baseDir);
+            const file = await app.vault.create(action.targetPath, action.contact.body ? action.contact.body + "\n" : "");
+            await writeFrontmatter(app, file, action.changes, plan.typ);
+            stats.created++;
+            continue;
+          }
+          if (action.changes.length > 0) {
+            await writeFrontmatter(app, action.file, action.changes, plan.typ);
+            stats.updated++;
+          }
+          if (action.rename) {
+            await app.fileManager.renameFile(action.file, action.rename);
+            stats.renamed++;
+          }
+        } catch (e) {
+          stats.errors++;
+          console.error("[Kontakt-Import] Fehler bei", action.contact.baseName, e);
+        }
+      }
+      for (const orphan of plan.orphans) {
+        if (progress?.cancelled) break;
+        done++;
+        progress?.update(done, orphan.file.basename);
+        try {
+          await ensureFolder(app, plan.trashDir);
+          await app.fileManager.renameFile(orphan.file, joinVaultPath(plan.trashDir, orphan.file.name));
+          stats.trashed++;
+        } catch (e) {
+          stats.errors++;
+          console.error("[Kontakt-Import] Fehler beim Verschieben nach _Trash:", orphan.file.path, e);
+        }
+      }
+      progress?.update(total, "");
+      return stats;
+    }
+    function logGroup(title, lines) {
+      if (lines.length === 0) return;
+      console.groupCollapsed(`[Kontakt-Import] ${title}`);
+      for (const line of lines) console.log(line);
+      console.groupEnd();
+    }
+    function reportPlan(plan, stats, dryRun) {
+      const byField = /* @__PURE__ */ new Map();
+      for (const c of plan.corrections) {
+        if (!byField.has(c.field)) byField.set(c.field, []);
+        byField.get(c.field).push(c);
+      }
+      const breakdown = [...byField.entries()].map(([field, list]) => `${list.length}\xD7 ${field}`);
+      logGroup(
+        `${plan.corrections.length} Normalisierungen (${breakdown.join(", ")})`,
+        [...byField.entries()].flatMap(([field, list]) => [
+          `\u2500\u2500 ${field} (${list.length})`,
+          ...list.map((c) => `   ${c.name}: "${c.from}" \u2192 "${c.to}"`)
+        ])
+      );
+      logGroup(
+        `${plan.skipped.length} \xFCbersprungen`,
+        plan.skipped.map((s) => `${s.name}: ${s.reason}`)
+      );
+      const renames = plan.actions.filter((a) => a.rename);
+      logGroup(
+        `${renames.length} Umbenennungen`,
+        renames.map((a) => `${a.file?.path ?? "(neu)"} \u2192 ${a.rename} (erkannt \xFCber ${a.via})`)
+      );
+      logGroup(
+        `${plan.orphans.length} nicht mehr in der CSV`,
+        plan.orphans.map((o) => o.file.path)
+      );
+      const cleared = plan.actions.flatMap(
+        (a) => a.changes.filter((c) => c.to === void 0).map((c) => `${a.contact.baseName} \u2013 ${c.key}: "${formatValue(c.from)}" entfernt`)
+      );
+      logGroup(`${cleared.length} Properties geleert (in Google gel\xF6scht)`, cleared);
+      const parts = [
+        `${stats.created} neu`,
+        `${stats.updated} aktualisiert`,
+        `${stats.renamed} umbenannt`,
+        `${stats.trashed} nach _Trash`
+      ];
+      if (cleared.length) parts.push(`${cleared.length} geleert`);
+      if (plan.corrections.length) parts.push(`${plan.corrections.length} normalisiert`);
+      if (plan.skipped.length) parts.push(`${plan.skipped.length} \xFCbersprungen`);
+      if (stats.errors) parts.push(`${stats.errors} Fehler`);
+      const summary = `${dryRun ? "[Probelauf] " : ""}Kontakt-Import: ${parts.join(", ")}. Details in der Konsole.`;
+      console.log("[Kontakt-Import]", summary);
+      new Notice(summary, 1e4);
+    }
+    async function importContactsFromCsv(plugin) {
+      let plan;
+      try {
+        plan = await buildPlan(plugin);
+      } catch (e) {
+        new Notice(`Kontakt-Import: ${e.message}`);
+        console.error("[Kontakt-Import]", e);
         return;
       }
-      const contactFiles = app.vault.getMarkdownFiles().filter((file) => file.path === basisVerzeichnis || file.path.startsWith(basisVerzeichnis + "/")).filter((file) => app.metadataCache.getFileCache(file)?.frontmatter?.TYP === "KONTAKT");
+      await resolveConflicts(plugin, plan.actions);
+      if (plugin.settings.contactsDryRun) {
+        reportPlan(
+          plan,
+          {
+            created: plan.actions.filter((a) => a.kind === "create").length,
+            updated: plan.actions.filter((a) => a.kind === "update" && a.changes.length > 0).length,
+            renamed: plan.actions.filter((a) => a.rename).length,
+            trashed: plan.orphans.length,
+            errors: 0
+          },
+          true
+        );
+        return;
+      }
+      const progress = createProgress(plugin, plan.actions.length + plan.orphans.length);
+      plugin.suspendPropertyBacklinks = true;
+      let stats;
+      try {
+        stats = await applyPlan(plugin, plan, progress);
+      } finally {
+        plugin.suspendPropertyBacklinks = false;
+        progress.finish();
+      }
+      if (progress.cancelled) new Notice("Kontakt-Import: abgebrochen.");
+      reportPlan(plan, stats, false);
+      await plugin.runPropertyBacklinkSync?.();
+    }
+    async function deleteUntouchedContacts(plugin) {
+      const { app } = plugin;
+      let plan;
+      try {
+        plan = await buildPlan(plugin);
+      } catch (e) {
+        new Notice(`Kontakt-Import: ${e.message}`);
+        return;
+      }
+      const sollByPath = /* @__PURE__ */ new Map();
+      for (const contact of plan.contacts) {
+        sollByPath.set(joinVaultPath(plan.baseDir, `${contact.fileName}.md`).toLowerCase(), contact);
+      }
+      const index = buildNoteIndex(app, plan.baseDir, plan.typ);
+      const candidates = [];
+      for (const entry of index.notes) {
+        if (isInFolder(entry.file.path, plan.trashDir)) continue;
+        const contact = sollByPath.get(entry.file.path.toLowerCase());
+        if (!contact) continue;
+        const keys = Object.keys(entry.frontmatter).filter((key) => key !== "TYP");
+        if (keys.some((key) => !plan.ownedKeys.has(key))) continue;
+        if (keys.some((key) => !valuesEqual(entry.frontmatter[key], contact.data[key]))) continue;
+        const raw = await app.vault.cachedRead(entry.file);
+        const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
+        if (body !== (contact.body || "").trim()) continue;
+        candidates.push(entry.file);
+      }
+      if (plugin.settings.contactsDryRun) {
+        logGroup(
+          `Probelauf: ${candidates.length} unver\xE4ndert`,
+          candidates.map((f) => f.path)
+        );
+        new Notice(`[Probelauf] ${index.notes.length} gepr\xFCft, ${candidates.length} unver\xE4ndert.`);
+        return;
+      }
       let deleted = 0;
       let errors = 0;
-      for (const file of contactFiles) {
+      for (const file of candidates) {
         try {
-          const { frontmatter, content } = await readContactFrontmatter(adapter, file.path);
-          if (!isUntouchedContact(frontmatter, content)) continue;
-          await safeRemoveContactFile(adapter, file.path);
+          await app.fileManager.trashFile(file);
           console.log(`[Kontakt-Import] Unver\xE4nderter Kontakt gel\xF6scht: ${file.path}`);
           deleted++;
         } catch (e) {
           errors++;
-          console.error("[Kontakt-Import] Fehler beim Pr\xFCfen/L\xF6schen:", file.path, e);
+          console.error("[Kontakt-Import] Fehler beim L\xF6schen:", file.path, e);
         }
       }
-      const summary = `Kontakt-Import: ${contactFiles.length} gepr\xFCft, ${deleted} unver\xE4nderte gel\xF6scht${errors ? `, ${errors} Fehler (siehe Konsole)` : ""}.`;
-      console.log("[Kontakt-Import]", summary);
-      new Notice(summary);
+      new Notice(
+        `Kontakt-Import: ${index.notes.length} gepr\xFCft, ${deleted} unver\xE4nderte gel\xF6scht${errors ? `, ${errors} Fehler` : ""}.`
+      );
     }
     module2.exports = { importContactsFromCsv, deleteUntouchedContacts };
+    module2.exports.__test = { buildPlan, normalizePhone, normalizeStreet, normalizeCountry, normalizeBirthday };
   }
 });
 
@@ -760,10 +1323,12 @@ var require_property_sync = __commonJS({
       };
       const onMetadataChanged = (file) => {
         if (!plugin.settings.propertyBacklinksLiveEnabled) return;
+        if (plugin.suspendPropertyBacklinks) return;
         if (file.extension !== "md") return;
         runSync();
       };
       plugin.registerEvent(plugin.app.metadataCache.on("changed", onMetadataChanged));
+      return runSync;
     }
     module2.exports = { syncAllLinks, registerPropertyBacklinksLive: registerPropertyBacklinksLive2 };
   }
@@ -780,12 +1345,12 @@ var require_commands = __commonJS({
       plugin.addCommand({
         id: "kontakte-csv-import",
         name: "KONTAKTE - Kontakte aus CSV aktualisieren",
-        callback: () => importContactsFromCsv(plugin.app, plugin.settings)
+        callback: () => importContactsFromCsv(plugin)
       });
       plugin.addCommand({
         id: "kontakte-unveraendert-loeschen",
         name: "KONTAKTE - Unver\xE4nderte Kontakte l\xF6schen",
-        callback: () => deleteUntouchedContacts(plugin.app, plugin.settings)
+        callback: () => deleteUntouchedContacts(plugin)
       });
       plugin.addCommand({
         id: "property-sync",
@@ -1513,7 +2078,7 @@ module.exports = class FredPlugin extends Plugin {
     registerCommands(this);
     this.addSettingTab(new FredSettingTab(this.app, this));
     this.updateDatabaseFolderStyle = registerDatabaseFolders(this);
-    registerPropertyBacklinksLive(this);
+    this.runPropertyBacklinkSync = registerPropertyBacklinksLive(this);
     registerNestedCheckboxSync(this);
     this.refreshImportantPluginCommands = registerImportantPlugins(this);
     registerItalicUnderscore(this);
