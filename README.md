@@ -28,6 +28,28 @@ Reziproke Verlinkung über beliebige Frontmatter-Properties (z. B. `Familie`), u
 
 Einstellungen: **Generell** → *Property-Backlinking*.
 
+## Bases: Property `file.hasNote`
+
+Stellt in Bases eine zusätzliche Datei-Property `file.hasNote` bereit - implementiert wie die eingebauten `file.embeds`/`file.tags`, also rein virtuell, ohne irgendetwas ins Frontmatter zu schreiben:
+
+- `true`, wenn die Notiz außerhalb des Frontmatters Inhalt hat, sonst `false`
+- überall nutzbar, wo Bases Properties anbietet: als Spalte, in Filtern (`file.hasNote`) und zum Gruppieren/Sortieren
+- aktualisiert sich beim Bearbeiten der Notiz automatisch mit
+- für Nicht-Markdown-Dateien (Bilder, PDFs, ...) zählt stattdessen eine Dateigröße über 0
+
+Technisch: Obsidian hat für eigene `file.*`-Properties keine öffentliche Registrierung, die Bausteine sind aber aus `obsidian` exportiert - ergänzt werden `FileValue.prototype.objectAccess`/`keys` und `BasesEntry.FILE_PROPERTIES`, beides additiv und beim Deaktivieren/Entladen zurückgenommen. Der Inhalt kommt aus dem Metadaten-Cache (eine `section` außer der `yaml`-Section des Frontmatters), weil `objectAccess()` synchron antworten muss. Die Property wirkt ausschließlich in Bases - sie ist Teil von Bases' Ausdruckssprache, nicht des Frontmatters, und damit z. B. für Dataview, die Obsidian-Suche oder Templates unsichtbar. Bereits geöffnete Bases übernehmen eine Umschaltung erst nach einem Neuaufbau.
+
+Außerhalb von Bases ist die Property nicht sichtbar (sie steht in keiner Datei und in keinem Index - `objectAccess` rechnet sie bei jedem Zugriff aus, genau wie Obsidian das bei `file.embeds` macht). Für Skripte und andere Plugins liegt dieselbe Prüfung deshalb direkt auf der Plugin-Instanz:
+
+```js
+app.plugins.plugins.fred.hasNoteContent(file)          // TFile
+app.plugins.plugins.fred.hasNoteContent("Ordner/X.md") // oder Pfad
+```
+
+Ordner, unbekannte Pfade und `undefined` ergeben `false`. Die Funktion hängt nicht am Toggle - der schaltet nur die Bases-Property, nicht die Logik.
+
+Einstellungen: **Generell** → *Bases*.
+
 ## KONTAKTE
 
 Import von Kontakten aus einer CSV-Datei (z. B. Google-Contacts-Export) in Notizen:

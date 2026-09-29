@@ -15,6 +15,7 @@
   "propertyBacklinksTypOrder": true,
   "nestedCheckboxSyncEnabled": true,
   "italicUnderscoreEnabled": true,
+  "basesHasNoteEnabled": true,
   "declaredLinkPairs": {
     "Familie": {
       "~Kontakte/Susanne Richter.md": [

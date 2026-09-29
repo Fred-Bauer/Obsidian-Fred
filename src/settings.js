@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   propertyBacklinksTypOrder: true,
   nestedCheckboxSyncEnabled: false,
   italicUnderscoreEnabled: false,
+  basesHasNoteEnabled: true,
   declaredLinkPairs: {},
   // Siehe important-plugins.js: aktivierte Plugin-IDs, für die automatisch
   // je ein eigener "Einstellungen öffnen"-Befehl entsteht.
@@ -189,6 +190,23 @@ class FredSettingTab extends PluginSettingTab {
             toggle.setValue(this.plugin.settings.italicUnderscoreEnabled).onChange(async (value) => {
               this.plugin.settings.italicUnderscoreEnabled = value;
               await this.plugin.saveSettings();
+            })
+          )
+      );
+
+    new SettingGroup(containerEl)
+      .setHeading("Bases")
+      .addSetting((setting) =>
+        setting
+          .setName('Property "file.hasNote"')
+          .setDesc(
+            'Stellt in Bases die zusätzliche Datei-Property "file.hasNote" bereit - wie die eingebauten file.embeds/file.tags, also ohne etwas ins Frontmatter zu schreiben. Sie ist true, wenn die Notiz außerhalb des Frontmatters Inhalt hat, und damit als Spalte, Filter oder Gruppierung nutzbar. Bereits geöffnete Bases zeigen sie erst nach einem Neuaufbau (Tab neu öffnen).'
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.basesHasNoteEnabled).onChange(async (value) => {
+              this.plugin.settings.basesHasNoteEnabled = value;
+              await this.plugin.saveSettings();
+              this.plugin.updateBasesHasNote?.();
             })
           )
       );

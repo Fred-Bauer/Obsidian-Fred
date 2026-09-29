@@ -106,6 +106,7 @@ var require_settings = __commonJS({
       propertyBacklinksTypOrder: true,
       nestedCheckboxSyncEnabled: false,
       italicUnderscoreEnabled: false,
+      basesHasNoteEnabled: true,
       declaredLinkPairs: {},
       // Siehe important-plugins.js: aktivierte Plugin-IDs, für die automatisch
       // je ein eigener "Einstellungen öffnen"-Befehl entsteht.
@@ -226,6 +227,17 @@ var require_settings = __commonJS({
             (toggle) => toggle.setValue(this.plugin.settings.italicUnderscoreEnabled).onChange(async (value) => {
               this.plugin.settings.italicUnderscoreEnabled = value;
               await this.plugin.saveSettings();
+            })
+          )
+        );
+        new SettingGroup(containerEl).setHeading("Bases").addSetting(
+          (setting) => setting.setName('Property "file.hasNote"').setDesc(
+            'Stellt in Bases die zus\xE4tzliche Datei-Property "file.hasNote" bereit - wie die eingebauten file.embeds/file.tags, also ohne etwas ins Frontmatter zu schreiben. Sie ist true, wenn die Notiz au\xDFerhalb des Frontmatters Inhalt hat, und damit als Spalte, Filter oder Gruppierung nutzbar. Bereits ge\xF6ffnete Bases zeigen sie erst nach einem Neuaufbau (Tab neu \xF6ffnen).'
+          ).addToggle(
+            (toggle) => toggle.setValue(this.plugin.settings.basesHasNoteEnabled).onChange(async (value) => {
+              this.plugin.settings.basesHasNoteEnabled = value;
+              await this.plugin.saveSettings();
+              this.plugin.updateBasesHasNote?.();
             })
           )
         );
@@ -1419,6 +1431,72 @@ var require_italic_underscore = __commonJS({
   }
 });
 
+// src/bases-has-note.js
+var require_bases_has_note = __commonJS({
+  "src/bases-has-note.js"(exports2, module2) {
+    var { FileValue, BasesEntry, BooleanValue } = require("obsidian");
+    var PROPERTY_NAME = "hasNote";
+    var PROPERTY_KEY = PROPERTY_NAME.toLowerCase();
+    var PROPERTY_ID = "file." + PROPERTY_NAME;
+    function hasNoteContent2(app, fileOrPath) {
+      const file = typeof fileOrPath === "string" ? app.vault.getFileByPath(fileOrPath) : fileOrPath;
+      if (!file?.stat) return false;
+      if (file.extension !== "md") return file.stat.size > 0;
+      const cache = app.metadataCache.getFileCache(file);
+      if (!cache) return file.stat.size > 0;
+      const sections = cache.sections;
+      if (!sections || sections.length === 0) return false;
+      return sections.some((section) => section.type !== "yaml");
+    }
+    function install() {
+      if (!FileValue?.prototype || !BooleanValue) {
+        console.warn('[Fred] Bases-Property "file.hasNote": FileValue/BooleanValue nicht verf\xFCgbar, \xFCbersprungen.');
+        return null;
+      }
+      const originalObjectAccess = FileValue.prototype.objectAccess;
+      const originalKeys = FileValue.prototype.keys;
+      FileValue.prototype.objectAccess = function(name) {
+        if (typeof name === "string" && name.toLowerCase() === PROPERTY_KEY) {
+          return new BooleanValue(hasNoteContent2(this.app, this.file));
+        }
+        return originalObjectAccess.call(this, name);
+      };
+      FileValue.prototype.keys = function() {
+        return originalKeys.call(this).concat([PROPERTY_NAME]);
+      };
+      const propertyList = Array.isArray(BasesEntry?.FILE_PROPERTIES) ? BasesEntry.FILE_PROPERTIES : null;
+      const listed = propertyList && !propertyList.includes(PROPERTY_ID);
+      if (listed) propertyList.push(PROPERTY_ID);
+      return () => {
+        FileValue.prototype.objectAccess = originalObjectAccess;
+        FileValue.prototype.keys = originalKeys;
+        if (listed) {
+          const index = propertyList.indexOf(PROPERTY_ID);
+          if (index !== -1) propertyList.splice(index, 1);
+        }
+      };
+    }
+    function registerBasesHasNote2(plugin) {
+      let uninstall = null;
+      const update = () => {
+        const enabled = plugin.settings.basesHasNoteEnabled;
+        if (enabled && !uninstall) uninstall = install();
+        else if (!enabled && uninstall) {
+          uninstall();
+          uninstall = null;
+        }
+      };
+      update();
+      plugin.register(() => {
+        uninstall?.();
+        uninstall = null;
+      });
+      return update;
+    }
+    module2.exports = { registerBasesHasNote: registerBasesHasNote2, hasNoteContent: hasNoteContent2, PROPERTY_ID };
+  }
+});
+
 // src/main.js
 var { Plugin } = require("obsidian");
 var { DEFAULT_SETTINGS, FredSettingTab } = require_settings();
@@ -1428,6 +1506,7 @@ var { registerPropertyBacklinksLive } = require_property_sync();
 var { registerNestedCheckboxSync } = require_nested_checkboxes();
 var { registerImportantPlugins } = require_important_plugins();
 var { registerItalicUnderscore } = require_italic_underscore();
+var { registerBasesHasNote, hasNoteContent } = require_bases_has_note();
 module.exports = class FredPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
@@ -1438,6 +1517,8 @@ module.exports = class FredPlugin extends Plugin {
     registerNestedCheckboxSync(this);
     this.refreshImportantPluginCommands = registerImportantPlugins(this);
     registerItalicUnderscore(this);
+    this.updateBasesHasNote = registerBasesHasNote(this);
+    this.hasNoteContent = (fileOrPath) => hasNoteContent(this.app, fileOrPath);
   }
   onunload() {
   }
