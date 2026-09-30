@@ -48,12 +48,39 @@
   align-items: center;
   gap: 6px;
   padding: 4px 0;
+  /* Umsortieren per Drag&Drop, siehe settings.js: gezogen wird die ganze
+     Zeile, nicht nur das Griff-Symbol. */
+  cursor: grab;
+}
+
+.fred-important-plugins-row:active {
+  cursor: grabbing;
 }
 
 .fred-important-plugins-name {
   flex: 1 1 auto;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
+}
+
+/* Anfasser für das Umsortieren per Drag&Drop (settings.js). Gezogen werden
+   kann die ganze Zeile, das Griff-Symbol zeigt es nur an. */
+.fred-important-plugins-grip {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.fred-important-plugins-grip .svg-icon {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+
+/* Die gezogene Zeile bleibt an ihrer neuen Stelle sichtbar (die Liste wird
+   schon während des Ziehens umgestellt), nur blasser. */
+.fred-important-plugins-row.is-dragging {
+  opacity: 0.4;
 }
 
 .fred-important-plugins-remove {
@@ -65,6 +92,8 @@
   flex-shrink: 0;
   padding: 0 !important;
   color: var(--text-faint);
+  /* Nicht den grab-Cursor der Zeile erben - hier wird geklickt. */
+  cursor: var(--cursor);
 }
 
 .fred-important-plugins-remove:hover {

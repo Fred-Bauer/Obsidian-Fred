@@ -16,7 +16,9 @@ Einstellungen: **Generell** → *Datenbank-Ordner*.
 
 Ausgewählte, aktivierte Community-Plugins lassen sich in eine Liste eintragen. Für jedes davon entsteht automatisch ein eigener Befehl, der Obsidians Einstellungen direkt auf dessen Seite öffnet - ohne Umweg über "Community plugins". Zusätzlich gibt es den Sammelbefehl **„Wichtiges Plugin - Einstellungen öffnen“**: bei genau einem eingetragenen Plugin ohne Zwischenschritt, sonst über eine native Auswahlliste. Ein deaktiviertes Plugin verschwindet automatisch aus der Liste (und damit auch sein Befehl), taucht nach erneuter Aktivierung aber wieder auf.
 
-Einstellungen: **Generell** → *Important Plugin Settings* (Plugins hinzufügen/entfernen).
+Die Reihenfolge der Liste lässt sich per **Drag&Drop** ändern (jede Zeile ist anfassbar, das Griff-Symbol links zeigt es an); sie bestimmt, in welcher Folge der Sammelbefehl die Plugins anbietet. Ausgeblendete, weil deaktivierte Einträge behalten dabei ihren Platz in der gespeicherten Liste.
+
+Einstellungen: **Generell** → *Important Plugin Settings* (Plugins hinzufügen/entfernen/sortieren).
 
 ## Property-Backlinking
 

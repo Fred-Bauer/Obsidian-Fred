@@ -250,7 +250,7 @@ class FredSettingTab extends PluginSettingTab {
           })
       )
       .addSetting((setting) => {
-        setting.setDesc("Eigener Befehl je Plugin, um dessen Einstellungen direkt zu öffnen.");
+        setting.setDesc("Eigener Befehl je Plugin, um dessen Einstellungen direkt zu öffnen. Reihenfolge per Drag&Drop.");
         listEl = setting.infoEl.createDiv({ cls: "fred-important-plugins-list" });
       });
 
@@ -268,11 +268,46 @@ class FredSettingTab extends PluginSettingTab {
         return;
       }
 
+      // Übernimmt die Reihenfolge, wie die Zeilen gerade im DOM stehen (nach
+      // dem Ziehen), in die Einstellung. Angezeigt werden nur aktivierte
+      // Plugins, gespeichert sind auch deaktivierte: deren Plätze in der Liste
+      // bleiben unverändert, nur die sichtbaren Plätze werden neu befüllt.
+      const saveOrderFromDom = async () => {
+        const visible = new Set(enabledIds);
+        const newOrder = Array.from(listEl.children, (el) => el.dataset.pluginId);
+        let next = 0;
+        this.plugin.settings.importantPlugins = this.plugin.settings.importantPlugins.map((id) =>
+          visible.has(id) ? newOrder[next++] : id
+        );
+        await this.plugin.saveSettings();
+        // Die Reihenfolge bestimmt, in welcher Folge der Sammelbefehl die
+        // Plugins zur Auswahl anbietet (siehe important-plugins.js).
+        this.plugin.refreshImportantPluginCommands?.();
+      };
+
+      // Die Liste ist ein Grid mit mehreren Spalten (styles.css), die
+      // Reihenfolge läuft darin zeilenweise von links nach rechts. Deshalb
+      // entscheidet innerhalb derselben Zeile die X-Position, ober- bzw.
+      // unterhalb davon die Y-Position.
+      const dropsBefore = (row, evt) => {
+        const rect = row.getBoundingClientRect();
+        if (evt.clientY < rect.top) return true;
+        if (evt.clientY > rect.bottom) return false;
+        return evt.clientX < rect.left + rect.width / 2;
+      };
+
       // Bewusst kein eigener Setting-Eintrag je Zeile - dessen reguläres
       // Padding/Schriftgröße wirkt für eine reine Name+Entfernen-Liste zu
       // wuchtig. Schlichte eigene Zeile stattdessen.
       for (const id of enabledIds) {
         const row = listEl.createDiv({ cls: "fred-important-plugins-row" });
+        // Natives HTML5-Drag&Drop statt Obsidians interner DragManager: für eine
+        // Liste in den eigenen Einstellungen genügt das und bleibt unabhängig
+        // von deren nicht dokumentierter API.
+        row.draggable = true;
+        row.dataset.pluginId = id;
+        const grip = row.createDiv({ cls: "fred-important-plugins-grip" });
+        setIcon(grip, "grip-vertical");
         row.createSpan({ cls: "fred-important-plugins-name", text: manifests[id].name });
         const removeBtn = row.createDiv({
           cls: "clickable-icon fred-important-plugins-remove",
@@ -285,8 +320,34 @@ class FredSettingTab extends PluginSettingTab {
           this.plugin.refreshImportantPluginCommands?.();
           renderImportantPluginsList();
         });
+
+        row.addEventListener("dragstart", (evt) => {
+          dragged = row;
+          row.addClass("is-dragging");
+          evt.dataTransfer.effectAllowed = "move";
+          // Ohne gesetzte Daten startet in Electron/Chromium kein Drag.
+          evt.dataTransfer.setData("text/plain", id);
+        });
+
+        // Die Zeilen werden schon während des Ziehens umgestellt, das ist die
+        // Vorschau - gespeichert wird erst am Ende (dragend).
+        row.addEventListener("dragover", (evt) => {
+          if (!dragged || dragged === row) return;
+          evt.preventDefault();
+          evt.dataTransfer.dropEffect = "move";
+          listEl.insertBefore(dragged, dropsBefore(row, evt) ? row : row.nextSibling);
+        });
+
+        row.addEventListener("dragend", async () => {
+          row.removeClass("is-dragging");
+          dragged = null;
+          await saveOrderFromDom();
+        });
       }
     };
+    // Über renderImportantPluginsList() hinweg gültig, weil ein Drag die Liste
+    // nicht neu aufbaut - erst das dragend speichert.
+    let dragged = null;
     renderImportantPluginsList();
   }
 

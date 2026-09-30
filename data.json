@@ -1,6 +1,6 @@
 {
   "contactsCsvPath": "_obsidian/data/contacts.csv",
-  "contactsBaseDir": "~Kontakte",
+  "contactsBaseDir": "~KONTAKTE",
   "contactsTyp": "KONTAKT",
   "contactsTrashSubdir": "_Trash",
   "contactsEditOnly": false,
@@ -27,14 +27,14 @@
         "~Kontakte/Harald Richter.md",
         "~Kontakte/Nils Richter.md"
       ],
+      "~Kontakte/Nils Richter.md": [
+        "~Kontakte/Harald Richter.md",
+        "~Kontakte/Susanne Richter.md"
+      ],
       "~Kontakte/Nora Heinzer.md": [
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Joachim Heinzer.md",
         "~Kontakte/Beate Heinzer.md"
-      ],
-      "~Kontakte/Nils Richter.md": [
-        "~Kontakte/Harald Richter.md",
-        "~Kontakte/Susanne Richter.md"
       ],
       "~Kontakte/Margot Bölte.md": [
         "~Kontakte/Dina Ristić.md"
@@ -64,6 +64,11 @@
         "~Kontakte/Nils Richter.md",
         "~Kontakte/Susanne Richter.md"
       ],
+      "~Kontakte/Beate Heinzer.md": [
+        "~Kontakte/Joachim Heinzer.md",
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Nora Heinzer.md"
+      ],
       "~Kontakte/Dina Ristić.md": [
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Clara Langhammer.md",
@@ -74,11 +79,6 @@
         "~Kontakte/Dina Ristić.md",
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Julia Langhammer.md"
-      ],
-      "~Kontakte/Beate Heinzer.md": [
-        "~Kontakte/Joachim Heinzer.md",
-        "~Kontakte/Linus Heinzer.md",
-        "~Kontakte/Nora Heinzer.md"
       ],
       "~Kontakte/Andreas Brüll.md": [
         "~Kontakte/Liam Brüll.md"
@@ -94,14 +94,14 @@
       "~Kontakte/Sarah.md": [
         "~Kontakte/Fiene ♥️.md"
       ],
-      "~Kontakte/Pablo.md": [
-        "~Kontakte/Fiene ♥️.md"
-      ],
       "~Kontakte/Nils Richter.md": [
         "~Kontakte/Liam Brüll.md",
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Maxim Gubo.md",
         "~Kontakte/Jan-Niklas Lepper.md"
+      ],
+      "~Kontakte/Pablo.md": [
+        "~Kontakte/Fiene ♥️.md"
       ],
       "~Kontakte/Maxim Gubo.md": [
         "~Kontakte/Nils Richter.md",
@@ -175,9 +175,10 @@
   },
   "importantPlugins": [
     "fred",
-    "obsidian-style-settings",
     "cmdr",
-    "typ-system"
+    "typ-system",
+    "obsidian-style-settings",
+    "obsidian-minimal-settings"
   ],
   "collapseBacklinksInDocument": true,
   "types": [
@@ -331,6 +332,7 @@
   "graphFocusedColorEnabled": false,
   "graphFocusedColor": "",
   "importantPluginsEnabled": true,
+  "lockContactPropertiesEnabled": true,
   "autoLinkedPairs": [
     {
       "property": "Familie",
