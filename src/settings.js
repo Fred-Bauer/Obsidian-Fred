@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   nestedCheckboxSyncEnabled: false,
   italicUnderscoreEnabled: false,
   basesHasNoteEnabled: true,
+  styleSettingsModifiedFilterEnabled: true,
   declaredLinkPairs: {},
   // Siehe important-plugins.js: aktivierte Plugin-IDs, für die automatisch
   // je ein eigener "Einstellungen öffnen"-Befehl entsteht.
@@ -214,6 +215,23 @@ class FredSettingTab extends PluginSettingTab {
               this.plugin.settings.basesHasNoteEnabled = value;
               await this.plugin.saveSettings();
               this.plugin.updateBasesHasNote?.();
+            })
+          )
+      );
+
+    new SettingGroup(containerEl)
+      .setHeading("Style Settings")
+      .addSetting((setting) =>
+        setting
+          .setName('Knopf "Modified"')
+          .setDesc(
+            'Ergänzt in den Einstellungen des Plugins "Style Settings" links neben Import/Export einen Knopf, der die Liste auf die Einstellungen filtert, die nicht mehr ihrem Standardwert entsprechen - ein zweiter Klick zeigt wieder alle. Zählt nur echte Abweichungen: ein Wert, der (z. B. durch zweimaliges Umschalten) wieder dem Standard entspricht, gilt als unverändert. Der Auf-/Zuklapp-Zustand der Überschriften bleibt dabei unberührt; wie viel in einer zugeklappten Sektion steckt, zeigt deren Trefferzahl. Wirkt im Einstellungs-Dialog, nicht in Style Settings\' Seitenleisten-Ansicht.'
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.styleSettingsModifiedFilterEnabled).onChange(async (value) => {
+              this.plugin.settings.styleSettingsModifiedFilterEnabled = value;
+              await this.plugin.saveSettings();
+              this.plugin.updateStyleSettingsFilter?.();
             })
           )
       );

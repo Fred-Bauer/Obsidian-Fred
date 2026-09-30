@@ -7,6 +7,7 @@ const { registerNestedCheckboxSync } = require("./nested-checkboxes");
 const { registerImportantPlugins } = require("./important-plugins");
 const { registerItalicUnderscore } = require("./italic-underscore");
 const { registerBasesHasNote, hasNoteContent } = require("./bases-has-note");
+const { registerStyleSettingsFilter } = require("./style-settings-filter");
 
 module.exports = class FredPlugin extends Plugin {
   async onload() {
@@ -19,6 +20,7 @@ module.exports = class FredPlugin extends Plugin {
     this.refreshImportantPluginCommands = registerImportantPlugins(this);
     registerItalicUnderscore(this);
     this.updateBasesHasNote = registerBasesHasNote(this);
+    this.updateStyleSettingsFilter = registerStyleSettingsFilter(this);
     // Für andere Plugins/Skripte (Templater, QuickAdd, ...):
     // app.plugins.plugins.fred.hasNoteContent(fileOderPfad). Bewusst unabhängig
     // vom Bases-Toggle - der schaltet nur die Property in Bases, nicht die Logik.

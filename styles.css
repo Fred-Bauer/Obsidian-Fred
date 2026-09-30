@@ -146,3 +146,17 @@
 .fred-kontakt-conflict-buttons button {
   margin: 0;
 }
+
+/* "Modified"-Knopf in den Einstellungen des Plugins "Style Settings"
+   (siehe style-settings-filter.js). Sitzt links neben dessen Import/Export
+   und übernimmt deren Aussehen (.style-settings-import/-export). */
+.fred-style-settings-modified {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+/* Filter aktiv - sonst wäre nicht zu erkennen, warum die Liste kürzer ist. */
+.fred-style-settings-modified.is-active {
+  font-weight: var(--font-semibold);
+  text-decoration: underline;
+}

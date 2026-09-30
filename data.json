@@ -21,6 +21,7 @@
   "nestedCheckboxSyncEnabled": true,
   "italicUnderscoreEnabled": true,
   "basesHasNoteEnabled": true,
+  "styleSettingsModifiedFilterEnabled": true,
   "declaredLinkPairs": {
     "Familie": {
       "~Kontakte/Susanne Richter.md": [
@@ -175,10 +176,9 @@
   },
   "importantPlugins": [
     "fred",
-    "cmdr",
-    "typ-system",
     "obsidian-style-settings",
-    "obsidian-minimal-settings"
+    "cmdr",
+    "typ-system"
   ],
   "collapseBacklinksInDocument": true,
   "types": [

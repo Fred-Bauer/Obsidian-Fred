@@ -52,6 +52,18 @@ Ordner, unbekannte Pfade und `undefined` ergeben `false`. Die Funktion hängt ni
 
 Einstellungen: **Generell** → *Bases*.
 
+## Style Settings: Knopf „Modified“
+
+Ergänzt im Einstellungs-Tab des Plugins **Style Settings** links neben *Import*/*Export* einen Knopf **Modified**. Ein Klick filtert die Liste auf die Einstellungen, die nicht mehr ihrem Standardwert entsprechen, ein zweiter Klick zeigt wieder alle. Getippte Suchbegriffe und der Filter schließen sich gegenseitig aus: der Knopf leert das Suchfeld, Tippen schaltet den Knopf wieder ab.
+
+Der Filter fasst den Auf-/Zuklapp-Zustand nicht an: offene Überschriften bleiben offen, geschlossene bleiben geschlossen - anders als Style Settings' eigene Textsuche, die Treffer aufklappt, leere Sektionen zuklappt und beim Zurückschalten alles zuklappt. Wie viel in einer zugeklappten Sektion steckt, verrät deren Trefferzahl in der Titelzeile; die gefilterte Auswahl erscheint dann beim Aufklappen. Überschriften ohne einen einzigen geänderten Eintrag werden ausgeblendet - das ist Filtern, kein Zuklappen.
+
+Maßgeblich ist der Vergleich mit dem Standard, nicht das bloße Vorhandensein eines gespeicherten Werts - wer einen Schalter zweimal umlegt, hinterlässt in Style Settings einen Eintrag mit dem Standardwert darin, und der zählt hier als unverändert. Farben werden dabei über die CSSOM normalisiert, damit `#FFF`, `#ffffff` und `rgb(255,255,255)` als derselbe Wert gelten; themenabhängige Farben gelten als geändert, sobald der helle **oder** der dunkle Wert abweicht.
+
+Technisch nutzt der Filter Style Settings' eigene Mechanik weiter (jede Sektion ist eine Baumkomponente mit `filterMode`/`filteredChildren`, genau wie bei dessen Textsuche) - nur entscheidet statt eines Fuzzy-Treffers „Wert ≠ Standard“. Gerechnet wird dabei getrennt vom Zeichnen: der Filter wird auf allen Sektionen gesetzt, neu gezeichnet werden aber nur die aufgeklappten - eine zugeklappte Sektion hat keine gezeichneten Kinder und zeigt die gefilterte Auswahl von selbst, sobald sie aufgeklappt wird. Gepatcht wird nichts an dessen Prototypen, sondern je eine Methode auf den konkreten Objekten (`settingsTab.display`, `settingsMarkup.generate`), damit der Knopf auch die plugin-eigenen Neuaufbauten nach Import oder „Reset all settings“ übersteht. Eingehängt wird über `app.setting.openTab`, weil Style Settings per Lazy Loading erst später geladen sein kann und dafür kein Ereignis anbietet. Wirkt im Einstellungs-Dialog, nicht in Style Settings' Seitenleisten-Ansicht.
+
+Einstellungen: **Generell** → *Style Settings*.
+
 ## KONTAKTE
 
 Import von Kontakten aus einer CSV-Datei (z. B. Google-Contacts-Export) in Notizen. Der Lauf wird erst vollständig durchgerechnet und dann angewandt – dadurch sind Probelauf, Konflikt-Dialog und Lösch-Befehl alle auf denselben Soll-Zustand gestützt.
