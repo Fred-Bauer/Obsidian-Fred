@@ -28,14 +28,14 @@
         "~Kontakte/Harald Richter.md",
         "~Kontakte/Nils Richter.md"
       ],
-      "~Kontakte/Nils Richter.md": [
-        "~Kontakte/Harald Richter.md",
-        "~Kontakte/Susanne Richter.md"
-      ],
       "~Kontakte/Nora Heinzer.md": [
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Joachim Heinzer.md",
         "~Kontakte/Beate Heinzer.md"
+      ],
+      "~Kontakte/Nils Richter.md": [
+        "~Kontakte/Harald Richter.md",
+        "~Kontakte/Susanne Richter.md"
       ],
       "~Kontakte/Margot Bölte.md": [
         "~Kontakte/Dina Ristić.md"
@@ -65,11 +65,6 @@
         "~Kontakte/Nils Richter.md",
         "~Kontakte/Susanne Richter.md"
       ],
-      "~Kontakte/Beate Heinzer.md": [
-        "~Kontakte/Joachim Heinzer.md",
-        "~Kontakte/Linus Heinzer.md",
-        "~Kontakte/Nora Heinzer.md"
-      ],
       "~Kontakte/Dina Ristić.md": [
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Clara Langhammer.md",
@@ -80,6 +75,11 @@
         "~Kontakte/Dina Ristić.md",
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Julia Langhammer.md"
+      ],
+      "~Kontakte/Beate Heinzer.md": [
+        "~Kontakte/Joachim Heinzer.md",
+        "~Kontakte/Linus Heinzer.md",
+        "~Kontakte/Nora Heinzer.md"
       ],
       "~Kontakte/Andreas Brüll.md": [
         "~Kontakte/Liam Brüll.md"
@@ -95,24 +95,19 @@
       "~Kontakte/Sarah.md": [
         "~Kontakte/Fiene ♥️.md"
       ],
+      "~Kontakte/Pablo.md": [
+        "~Kontakte/Fiene ♥️.md"
+      ],
       "~Kontakte/Nils Richter.md": [
         "~Kontakte/Liam Brüll.md",
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Maxim Gubo.md",
         "~Kontakte/Jan-Niklas Lepper.md"
       ],
-      "~Kontakte/Pablo.md": [
-        "~Kontakte/Fiene ♥️.md"
-      ],
       "~Kontakte/Maxim Gubo.md": [
         "~Kontakte/Nils Richter.md",
         "~Kontakte/Linus Heinzer.md",
         "~Kontakte/Liam Brüll.md"
-      ],
-      "~Kontakte/Lisa Bender.md": [
-        "~Kontakte/Justine Schmandt.md",
-        "~Kontakte/Lena Michelle Schäfer.md",
-        "~Kontakte/Leo Ulreich.md"
       ],
       "~Kontakte/Linus Heinzer.md": [
         "~Kontakte/Liam Brüll.md",
@@ -123,6 +118,11 @@
         "~Kontakte/Leo Ulreich.md",
         "~Kontakte/Laurent Skalski.md",
         "~Kontakte/Teresa Steinmetz.md"
+      ],
+      "~Kontakte/Lisa Bender.md": [
+        "~Kontakte/Justine Schmandt.md",
+        "~Kontakte/Lena Michelle Schäfer.md",
+        "~Kontakte/Leo Ulreich.md"
       ],
       "~Kontakte/Liam Brüll.md": [
         "~Kontakte/Linus Heinzer.md",
@@ -179,177 +179,5 @@
     "obsidian-style-settings",
     "cmdr",
     "typ-system"
-  ],
-  "collapseBacklinksInDocument": true,
-  "types": [
-    "WIKI",
-    "NOTIZ",
-    "TEXT",
-    "VORTRAG",
-    "PROJEKT",
-    "ORGA",
-    "KONTAKT",
-    "MEDIA",
-    "TERMIN",
-    "EXTERN"
-  ],
-  "typeColors": {
-    "WIKI": "#ece879",
-    "ORGA": "#7a87e6",
-    "NOTIZ": "#e2aa69",
-    "TEXT": "#d29f46",
-    "MEDIA": "#42943d",
-    "VORTRAG": "#a0701c",
-    "PROJEKT": "#9adf81",
-    "EXTERN": "#ffffff",
-    "KONTAKT": "#c64e4e"
-  },
-  "typeDescriptions": {
-    "WIKI": "Begriffsnotiz",
-    "ORGA": "Verwaltungsnotiz",
-    "NOTIZ": "Rohe Notiz, Überlegung, Rezept, ...",
-    "TEXT": "Auseinandersetzung mit den Thesen einer Quelle",
-    "VORTRAG": "Vortragsbezogene Notizen",
-    "PROJEKT": "..planung",
-    "EXTERN": "Webclippings oder AI-Generated Content",
-    "KONTAKT": "Importierte Kontakte"
-  },
-  "typeDefaultFrontmatter": {
-    "ORGA": {},
-    "TEXT": {
-      "Titel": null,
-      "Autor": null,
-      "Erscheinung": null,
-      "Quelle": null
-    },
-    "NOTIZ": {},
-    "VORTRAG": {
-      "Autor": "{{tp.waehleAutorVortrag}}",
-      "Datum": "{{created}}"
-    },
-    "PROJEKT": {
-      "Beschreibung": null,
-      "Status": "Plan",
-      "Mandatory": null,
-      "Termin": null
-    },
-    "KONTAKT": {
-      "Vorname": null,
-      "Nachname": null,
-      "Geburtstag": null,
-      "Handynummer": null,
-      "E-Mail": null,
-      "Strasse": null,
-      "Stadt": null,
-      "Plz": null,
-      "Nation": null,
-      "Familie": null,
-      "Freunde": null
-    }
-  },
-  "typeFloatingKeys": {
-    "PROJEKT": [
-      "Termin",
-      "Mandatory"
-    ],
-    "KONTAKT": [
-      "Familie",
-      "Freunde",
-      "Nation",
-      "Plz",
-      "Strasse",
-      "E-Mail",
-      "Handynummer",
-      "Geburtstag"
-    ]
-  },
-  "typeManual": {
-    "EXTERN": false,
-    "KONTAKT": false
-  },
-  "subtypesByType": {
-    "KONTAKT": [
-      "TEST"
-    ]
-  },
-  "subtypeDescriptions": {},
-  "globalPropertyOrder": [
-    {
-      "kind": "property",
-      "name": "cssclasses"
-    },
-    {
-      "kind": "typValue"
-    },
-    {
-      "kind": "subtypValue"
-    },
-    {
-      "kind": "property",
-      "name": "aliases"
-    },
-    {
-      "kind": "typ"
-    },
-    {
-      "kind": "other"
-    },
-    {
-      "kind": "property",
-      "name": "tags"
-    }
-  ],
-  "noteTitleStyle": "none",
-  "noteTitleBadgeColored": false,
-  "noteTitleBadgePosition": "block",
-  "noteTitleVerticalAlign": "bottom",
-  "typSortOrder": "manual",
-  "typListDescriptionEnabled": true,
-  "typSubtypPaneRatio": 0.4612035284770212,
-  "includeIgnoredFiles": false,
-  "graphTagColorEnabled": true,
-  "graphTagColor": "#1c1c1c",
-  "graphAttachmentColorEnabled": false,
-  "graphAttachmentColor": "#9f8632",
-  "colorViews": {
-    "fileExplorer": true,
-    "graph": true,
-    "search": true,
-    "recentFiles": true,
-    "backlinks": true,
-    "frontmatterDefaults": true,
-    "typList": true,
-    "allProperties": true,
-    "noteTitle": false,
-    "noteTitleColor": true,
-    "bookmarks": true
-  },
-  "fileStatsEnabled": true,
-  "graphUnresolvedColorEnabled": false,
-  "graphUnresolvedColor": "",
-  "graphDefaultColorEnabled": false,
-  "graphDefaultColor": "",
-  "graphFocusedColorEnabled": false,
-  "graphFocusedColor": "",
-  "importantPluginsEnabled": true,
-  "lockContactPropertiesEnabled": true,
-  "autoLinkedPairs": [
-    {
-      "property": "Familie",
-      "declaredIn": "~KONTAKTE/Linus Heinzer.md",
-      "addedTo": "~KONTAKTE/Julia Langhammer.md"
-    },
-    {
-      "property": "Familie",
-      "declaredIn": "~KONTAKTE/Linus Heinzer.md",
-      "addedTo": "~KONTAKTE/Julia Langhammer.md"
-    },
-    {
-      "property": "Familie",
-      "declaredIn": "~KONTAKTE/Linus Heinzer.md",
-      "addedTo": "~KONTAKTE/Julia Langhammer.md"
-    }
-  ],
-  "familySyncLiveEnabled": true,
-  "familyPropertyName": ""
+  ]
 }

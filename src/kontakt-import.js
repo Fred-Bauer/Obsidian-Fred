@@ -843,14 +843,34 @@ function createProgress(plugin, total) {
 /* Schreiben                                                           */
 /* ------------------------------------------------------------------ */
 
+// Der SUBTYP gehört der Notiz, nicht dem Import: er kommt aus dem TYP-System
+// oder von Hand, steht in keiner CSV-Spalte und darf einen Import unverändert
+// überstehen. Gelesen wird er ohne Beachtung der Groß-/Kleinschreibung, weil
+// Obsidian Property-Namen so behandelt ("Subtyp" und "SUBTYP" sind dieselbe
+// Property) - genau wie das TYP-System es beim Schreiben tut.
+function existingSubtyp(frontmatter) {
+  const key = Object.keys(frontmatter).find((name) => name.toLowerCase() === "subtyp");
+  const value = key === undefined ? undefined : frontmatter[key];
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
 // Alles geht durch processFrontMatter und sortFrontmatter - der Import
 // bringt damit keine eigene Reihenfolge mehr mit, sondern übernimmt die
 // des TYP-Systems. Vorher fraßen sich beide gegenseitig auf: der Import
 // zog tags nach vorn, die Frontmatter-Sortierung wieder nach hinten.
+//
+// Der Subtyp muss dabei durchgereicht werden: applyTypeProperties(fm, typ,
+// null) LÖSCHT einen vorhandenen SUBTYP (siehe typ-system/src/main.js), und
+// sortFrontmatter ohne Subtyp kennt dessen Property-Block nicht und schöbe
+// die Subtyp-Properties ans Ende. Ein fest übergebenes null hätte deshalb,
+// sobald KONTAKT Subtypen bekommt, bei jedem Update die Klassifizierung der
+// Notiz stillschweigend mitgelöscht.
 async function writeFrontmatter(app, file, changes, typ) {
   const typSystem = getTypSystem(app);
   await app.fileManager.processFrontMatter(file, (frontmatter) => {
-    if (typSystem?.applyTypeProperties) typSystem.applyTypeProperties(frontmatter, typ, null);
+    const subtyp = existingSubtyp(frontmatter);
+
+    if (typSystem?.applyTypeProperties) typSystem.applyTypeProperties(frontmatter, typ, subtyp);
     else frontmatter.TYP = typ;
 
     for (const change of changes) {
@@ -858,7 +878,7 @@ async function writeFrontmatter(app, file, changes, typ) {
       else frontmatter[change.key] = change.to;
     }
 
-    typSystem?.sortFrontmatter?.(frontmatter, typ, null);
+    typSystem?.sortFrontmatter?.(frontmatter, typ, subtyp);
   });
 }
 
@@ -1065,6 +1085,12 @@ async function deleteUntouchedContacts(plugin) {
     // Fremde Properties (Familie/Freunde, eigene Ergänzungen) zählen als
     // "angefasst" - ebenso jeder abweichende Wert und jeder Fließtext, den
     // der Import nicht selbst geschrieben hat.
+    //
+    // Ausgenommen ist allein TYP: den setzt der Import selbst, er steht aber
+    // nicht in ownedKeys. SUBTYP gehört bewusst NICHT in diese Ausnahme - er
+    // ist eine Klassifizierung von Hand und damit gerade das Gegenteil von
+    // "unverändert". Eine Notiz mit SUBTYP fällt hier also durch und bleibt
+    // stehen; das ist die gewollte Richtung, weil hier gelöscht wird.
     const keys = Object.keys(entry.frontmatter).filter((key) => key !== "TYP");
     if (keys.some((key) => !plan.ownedKeys.has(key))) continue;
     if (keys.some((key) => !valuesEqual(entry.frontmatter[key], contact.data[key]))) continue;
