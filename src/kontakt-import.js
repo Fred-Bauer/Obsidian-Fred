@@ -1036,21 +1036,16 @@ async function importContactsFromCsv(plugin) {
     return;
   }
 
-  // Das Live-Property-Backlinking würde bei jeder geschriebenen Notiz einen
-  // Lauf über den gesamten Vault auslösen. Einmal am Ende reicht.
   const progress = createProgress(plugin, plan.actions.length + plan.orphans.length);
-  plugin.suspendPropertyBacklinks = true;
   let stats;
   try {
     stats = await applyPlan(plugin, plan, progress);
   } finally {
-    plugin.suspendPropertyBacklinks = false;
     progress.finish();
   }
 
   if (progress.cancelled) new Notice("Kontakt-Import: abgebrochen.");
   reportPlan(plan, stats, false);
-  await plugin.runPropertyBacklinkSync?.();
 }
 
 // Debugging-Hilfe: löscht Kontakte, die exakt so aussehen, wie der Import

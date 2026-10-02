@@ -24,8 +24,8 @@ Einstellungen: **Generell** → *Important Plugin Settings* (Plugins hinzufügen
 
 Reziproke Verlinkung über beliebige Frontmatter-Properties (z. B. `Familie`), unabhängig vom Notiz-TYP: Verlinkt Notiz A in einer dieser Properties Notiz B, bekommt B automatisch denselben Backlink ergänzt – und wieder entfernt, sobald die Verlinkung in A wegfällt.
 
-- Befehl **„Property-Backlinking aktualisieren“** stößt den Abgleich manuell an
-- optional: Live-Abgleich direkt beim Speichern
+- an-/abschaltbar; beim Einschalten (und nach Ändern der Property-Liste) werden auf diesem Gerät alle fehlenden Backlinks ergänzt. Ein Link, der entfernt wurde, während das Backlinking aus war, bleibt bei der Gegenseite stehen – am bloßen Ist-Zustand ist eine Löschung nicht von einer neuen Verlinkung zu unterscheiden
+- verträgt Obsidian Sync über mehrere Geräte: Verglichen wird pro Notiz deren alte mit der neuen Fassung (beide aus dem Metadaten-Cache), ohne einen eigenen gespeicherten Stand
 - optional: **Reihenfolge aus TYP-System übernehmen** – eine dabei neu angelegte Property landet an ihrem Platz laut Frontmatter-Sortierung des TYP-Systems (über dessen `placeProperty()`), statt am Ende; nur sie wird einsortiert, der Rest bleibt unverändert
 
 Einstellungen: **Generell** → *Property-Backlinking*.
@@ -79,8 +79,6 @@ Import von Kontakten aus einer CSV-Datei (z. B. Google-Contacts-Export) in Notiz
 **Normalisierung** (abschaltbar, jede Korrektur wird gruppiert in der Konsole protokolliert): Telefonnummern auf `+49`-Format inklusive geschützter Leerzeichen, E-Mails klein, bekannte Länderkürzel ausgeschrieben, Hausnummern aus US- in deutsche Reihenfolge, `Str.` ausgeschrieben. Eine reine Umschreibung gilt dabei nie als Konflikt – sonst bliebe sie im Modus „nur Lücken füllen“ für immer liegen.
 
 **Bei abweichenden Werten** ist einstellbar, ob die CSV gewinnt, nur leere Properties gefüllt werden oder pro betroffenem Kontakt ein Dialog erscheint. Dazu zählt auch der Fall, dass ein Wert in Google gelöscht wurde: die Property wird dann geleert, im Dialog erscheint sie als „in Google gelöscht“. Geleert werden allerdings nur Properties, deren Quellspalte im CSV-Header überhaupt vorkommt – sonst würde ein knapperer Export Felder abräumen, über die er gar keine Aussage trifft. Tags werden immer zusammengeführt statt ersetzt und nie geleert.
-
-Während des Imports pausiert das Live-Property-Backlinking; zum Schluss läuft genau ein vollständiger Abgleich statt einer pro geschriebener Notiz.
 
 Einstellungen: **KONTAKTE**.
 

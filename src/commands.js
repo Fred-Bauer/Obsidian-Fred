@@ -1,6 +1,4 @@
-const { Notice } = require("obsidian");
 const { importContactsFromCsv, deleteUntouchedContacts } = require("./kontakt-import");
-const { syncAllLinks } = require("./property-sync");
 const { openImportantPluginSettingsPicker } = require("./important-plugins");
 
 function registerCommands(plugin) {
@@ -15,19 +13,6 @@ function registerCommands(plugin) {
     id: "kontakte-unveraendert-loeschen",
     name: "KONTAKTE - Unveränderte Kontakte löschen",
     callback: () => deleteUntouchedContacts(plugin),
-  });
-
-  plugin.addCommand({
-    id: "property-sync",
-    name: "Property-Backlinking - Aktualisieren",
-    callback: async () => {
-      const result = await syncAllLinks(plugin.app, plugin.settings.reciprocalLinkProperties, plugin.settings.declaredLinkPairs, {
-        typOrder: plugin.settings.propertyBacklinksTypOrder,
-      });
-      plugin.settings.declaredLinkPairs = result.declaredPairs;
-      await plugin.saveSettings();
-      new Notice(`Property-Backlinking: ${result.checked} Notizen geprüft, ${result.added} ergänzt, ${result.removed} entfernt.`);
-    },
   });
 
   plugin.addCommand({

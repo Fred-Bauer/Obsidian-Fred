@@ -115,7 +115,6 @@ var require_settings = __commonJS({
       italicUnderscoreEnabled: false,
       basesHasNoteEnabled: true,
       styleSettingsModifiedFilterEnabled: true,
-      declaredLinkPairs: {},
       // Siehe important-plugins.js: aktivierte Plugin-IDs, für die automatisch
       // je ein eigener "Einstellungen öffnen"-Befehl entsteht.
       importantPlugins: []
@@ -193,19 +192,23 @@ var require_settings = __commonJS({
         new SettingGroup(containerEl).setHeading("Property-Backlinking").addSetting(
           (setting) => setting.setName("Properties").setDesc(
             "Kommagetrennte Liste von Frontmatter-Properties mit Links zu anderen Notizen (z. B. Familie, Freunde) - gilt f\xFCr alle Notizen, unabh\xE4ngig vom TYP. Verlinkt eine Notiz hier eine andere, bekommt die andere automatisch den Backlink in derselben Property erg\xE4nzt - und wieder entfernt, sobald die Verlinkung wegf\xE4llt. Gro\xDF-/Kleinschreibung muss exakt zum Property-Namen passen."
-          ).addText(
-            (text) => text.setValue(this.plugin.settings.reciprocalLinkProperties.join(", ")).onChange(async (value) => {
+          ).addText((text) => {
+            text.setValue(this.plugin.settings.reciprocalLinkProperties.join(", ")).onChange(async (value) => {
               this.plugin.settings.reciprocalLinkProperties = value.split(",").map((name) => name.trim()).filter((name) => name.length > 0);
               await this.plugin.saveSettings();
-            })
-          )
+            });
+            text.inputEl.addEventListener("change", () => {
+              if (this.plugin.settings.propertyBacklinksLiveEnabled) this.plugin.addMissingPropertyBacklinks();
+            });
+          })
         ).addSetting(
-          (setting) => setting.setName("Live aktualisieren").setDesc(
-            'Property-Backlinking sofort beim Speichern abgleichen, statt nur auf Befehl ("Property-Backlinking aktualisieren").'
+          (setting) => setting.setName("Aktiv").setDesc(
+            "Spiegelt jede \xC4nderung an diesen Properties sofort bei der verlinkten Notiz. Beim Einschalten werden alle fehlenden Backlinks erg\xE4nzt; ein Link, der entfernt wurde, w\xE4hrend das Backlinking aus war, bleibt bei der verlinkten Notiz dagegen stehen."
           ).addToggle(
             (toggle) => toggle.setValue(this.plugin.settings.propertyBacklinksLiveEnabled).onChange(async (value) => {
               this.plugin.settings.propertyBacklinksLiveEnabled = value;
               await this.plugin.saveSettings();
+              if (value) this.plugin.addMissingPropertyBacklinks();
             })
           )
         ).addSetting(
@@ -1173,17 +1176,14 @@ var require_kontakt_import = __commonJS({
         return;
       }
       const progress = createProgress(plugin, plan.actions.length + plan.orphans.length);
-      plugin.suspendPropertyBacklinks = true;
       let stats;
       try {
         stats = await applyPlan(plugin, plan, progress);
       } finally {
-        plugin.suspendPropertyBacklinks = false;
         progress.finish();
       }
       if (progress.cancelled) new Notice("Kontakt-Import: abgebrochen.");
       reportPlan(plan, stats, false);
-      await plugin.runPropertyBacklinkSync?.();
     }
     async function deleteUntouchedContacts(plugin) {
       const { app } = plugin;
@@ -1241,161 +1241,10 @@ var require_kontakt_import = __commonJS({
   }
 });
 
-// src/property-sync.js
-var require_property_sync = __commonJS({
-  "src/property-sync.js"(exports2, module2) {
-    var { TFile } = require("obsidian");
-    function parseLinkText(entry) {
-      const match = entry.match(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
-      return match ? match[1] : entry;
-    }
-    function toArray(value) {
-      if (Array.isArray(value)) return value;
-      if (value === void 0 || value === null || value === "") return [];
-      return [value];
-    }
-    function resolveLinkTargets(app, ownerFile, propertyValue) {
-      const targets = [];
-      for (const entry of toArray(propertyValue)) {
-        if (typeof entry !== "string") continue;
-        const dest = app.metadataCache.getFirstLinkpathDest(parseLinkText(entry), ownerFile.path);
-        if (!dest) {
-          console.warn(`[Property-Backlinking] Link konnte nicht aufgel\xF6st werden: "${entry}" in ${ownerFile.path}`);
-          continue;
-        }
-        if (dest.path !== ownerFile.path) targets.push(dest);
-      }
-      return targets;
-    }
-    function computeDeclaredPairs(app, propertyNames, files) {
-      const pairs = {};
-      for (const propertyName of propertyNames) {
-        const bySource = {};
-        for (const file of files) {
-          const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
-          if (!frontmatter?.[propertyName]) continue;
-          const targets = resolveLinkTargets(app, file, frontmatter[propertyName]);
-          if (targets.length > 0) bySource[file.path] = targets.map((t) => t.path);
-        }
-        pairs[propertyName] = bySource;
-      }
-      return pairs;
-    }
-    function getTargetSet(pairs, propertyName, sourcePath) {
-      return new Set(pairs?.[propertyName]?.[sourcePath] ?? []);
-    }
-    async function addLinkToProperty(app, propertyName, ownerFile, targetFile, typOrder) {
-      await app.fileManager.processFrontMatter(ownerFile, (frontmatter) => {
-        const current = toArray(frontmatter[propertyName]);
-        const alreadyThere = resolveLinkTargets(app, ownerFile, current).some((f) => f.path === targetFile.path);
-        if (alreadyThere) return;
-        const isNew = !Object.prototype.hasOwnProperty.call(frontmatter, propertyName);
-        const link = app.fileManager.generateMarkdownLink(targetFile, ownerFile.path);
-        frontmatter[propertyName] = [...current, link];
-        if (isNew && typOrder) app.plugins.plugins["typ-system"]?.placeProperty?.(frontmatter, propertyName);
-      });
-    }
-    async function removeLinkFromProperty(app, propertyName, ownerFile, targetPath) {
-      await app.fileManager.processFrontMatter(ownerFile, (frontmatter) => {
-        const current = toArray(frontmatter[propertyName]);
-        const filtered = current.filter((entry) => {
-          if (typeof entry !== "string") return true;
-          const dest = app.metadataCache.getFirstLinkpathDest(parseLinkText(entry), ownerFile.path);
-          return !(dest && dest.path === targetPath);
-        });
-        if (filtered.length === current.length) return;
-        if (filtered.length === 0) delete frontmatter[propertyName];
-        else frontmatter[propertyName] = filtered;
-      });
-    }
-    async function applyChanges(app, propertyNames, previousPairs, currentPairs, typOrder) {
-      let added = 0;
-      let removed = 0;
-      for (const propertyName of propertyNames) {
-        const sourcePaths = /* @__PURE__ */ new Set([
-          ...Object.keys(previousPairs?.[propertyName] ?? {}),
-          ...Object.keys(currentPairs?.[propertyName] ?? {})
-        ]);
-        for (const sourcePath of sourcePaths) {
-          const prevTargets = getTargetSet(previousPairs, propertyName, sourcePath);
-          const currTargets = getTargetSet(currentPairs, propertyName, sourcePath);
-          for (const targetPath of currTargets) {
-            if (prevTargets.has(targetPath)) continue;
-            const sourceFile = app.vault.getAbstractFileByPath(sourcePath);
-            const targetFile = app.vault.getAbstractFileByPath(targetPath);
-            if (!(sourceFile instanceof TFile) || !(targetFile instanceof TFile)) continue;
-            await addLinkToProperty(app, propertyName, targetFile, sourceFile, typOrder);
-            console.log(`[Property-Backlinking] "${propertyName}": ${targetFile.path} <- ${sourceFile.path} erg\xE4nzt`);
-            added++;
-          }
-          for (const targetPath of prevTargets) {
-            if (currTargets.has(targetPath)) continue;
-            const targetFile = app.vault.getAbstractFileByPath(targetPath);
-            if (!(targetFile instanceof TFile)) continue;
-            await removeLinkFromProperty(app, propertyName, targetFile, sourcePath);
-            console.log(`[Property-Backlinking] "${propertyName}": ${targetFile.path} <- ${sourcePath} entfernt`);
-            removed++;
-          }
-        }
-      }
-      return { added, removed };
-    }
-    async function syncAllLinks(app, propertyNames, previousPairs, { typOrder = false } = {}) {
-      const files = app.vault.getMarkdownFiles();
-      console.log(`[Property-Backlinking] Pr\xFCfe ${files.length} Notizen f\xFCr Properties: ${propertyNames.join(", ")}`);
-      const currentPairs = computeDeclaredPairs(app, propertyNames, files);
-      const { added, removed } = await applyChanges(app, propertyNames, previousPairs, currentPairs, typOrder);
-      return {
-        checked: files.length,
-        added,
-        removed,
-        declaredPairs: currentPairs
-      };
-    }
-    function registerPropertyBacklinksLive2(plugin) {
-      let running = false;
-      let pending = false;
-      const runSync = async () => {
-        if (running) {
-          pending = true;
-          return;
-        }
-        running = true;
-        try {
-          const result = await syncAllLinks(plugin.app, plugin.settings.reciprocalLinkProperties, plugin.settings.declaredLinkPairs, {
-            typOrder: plugin.settings.propertyBacklinksTypOrder
-          });
-          plugin.settings.declaredLinkPairs = result.declaredPairs;
-          await plugin.saveSettings();
-        } catch (e) {
-          console.error("[Property-Backlinking] Fehler:", e);
-        } finally {
-          running = false;
-          if (pending) {
-            pending = false;
-            runSync();
-          }
-        }
-      };
-      const onMetadataChanged = (file) => {
-        if (!plugin.settings.propertyBacklinksLiveEnabled) return;
-        if (plugin.suspendPropertyBacklinks) return;
-        if (file.extension !== "md") return;
-        runSync();
-      };
-      plugin.registerEvent(plugin.app.metadataCache.on("changed", onMetadataChanged));
-      return runSync;
-    }
-    module2.exports = { syncAllLinks, registerPropertyBacklinksLive: registerPropertyBacklinksLive2 };
-  }
-});
-
 // src/commands.js
 var require_commands = __commonJS({
   "src/commands.js"(exports2, module2) {
-    var { Notice } = require("obsidian");
     var { importContactsFromCsv, deleteUntouchedContacts } = require_kontakt_import();
-    var { syncAllLinks } = require_property_sync();
     var { openImportantPluginSettingsPicker } = require_important_plugins();
     function registerCommands2(plugin) {
       plugin.addCommand({
@@ -1407,18 +1256,6 @@ var require_commands = __commonJS({
         id: "kontakte-unveraendert-loeschen",
         name: "KONTAKTE - Unver\xE4nderte Kontakte l\xF6schen",
         callback: () => deleteUntouchedContacts(plugin)
-      });
-      plugin.addCommand({
-        id: "property-sync",
-        name: "Property-Backlinking - Aktualisieren",
-        callback: async () => {
-          const result = await syncAllLinks(plugin.app, plugin.settings.reciprocalLinkProperties, plugin.settings.declaredLinkPairs, {
-            typOrder: plugin.settings.propertyBacklinksTypOrder
-          });
-          plugin.settings.declaredLinkPairs = result.declaredPairs;
-          await plugin.saveSettings();
-          new Notice(`Property-Backlinking: ${result.checked} Notizen gepr\xFCft, ${result.added} erg\xE4nzt, ${result.removed} entfernt.`);
-        }
       });
       plugin.addCommand({
         id: "open-important-plugin-settings",
@@ -1809,6 +1646,204 @@ var require_database_folders = __commonJS({
       return updateStyle;
     }
     module2.exports = { registerDatabaseFolders: registerDatabaseFolders2 };
+  }
+});
+
+// src/property-sync.js
+var require_property_sync = __commonJS({
+  "src/property-sync.js"(exports2, module2) {
+    var { TFile, Notice } = require("obsidian");
+    var WRITE_DELAY_MS = 2e3;
+    function parseLinkText(entry) {
+      const match = entry.match(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
+      return match ? match[1] : entry;
+    }
+    function toArray(value) {
+      if (Array.isArray(value)) return value;
+      if (value === void 0 || value === null || value === "") return [];
+      return [value];
+    }
+    function resolveLinkTargets(app, ownerFile, propertyValue) {
+      const targets = [];
+      for (const entry of toArray(propertyValue)) {
+        if (typeof entry !== "string") continue;
+        const dest = app.metadataCache.getFirstLinkpathDest(parseLinkText(entry), ownerFile.path);
+        if (dest && dest.path !== ownerFile.path) targets.push(dest);
+      }
+      return targets;
+    }
+    function linkTargetsByProperty(app, file, frontmatter, propertyNames) {
+      const targets = {};
+      for (const propertyName of propertyNames) {
+        const value = frontmatter?.[propertyName];
+        targets[propertyName] = new Set(value ? resolveLinkTargets(app, file, value).map((f) => f.path) : []);
+      }
+      return targets;
+    }
+    async function addLinkToProperty(app, propertyName, ownerFile, targetFile, typOrder) {
+      let added = false;
+      await app.fileManager.processFrontMatter(ownerFile, (frontmatter) => {
+        const current = toArray(frontmatter[propertyName]);
+        const alreadyThere = resolveLinkTargets(app, ownerFile, current).some((f) => f.path === targetFile.path);
+        if (alreadyThere) return;
+        const isNew = !Object.prototype.hasOwnProperty.call(frontmatter, propertyName);
+        const link = app.fileManager.generateMarkdownLink(targetFile, ownerFile.path);
+        frontmatter[propertyName] = [...current, link];
+        if (isNew && typOrder) app.plugins.plugins["typ-system"]?.placeProperty?.(frontmatter, propertyName);
+        added = true;
+      });
+      return added;
+    }
+    async function removeLinkFromProperty(app, propertyName, ownerFile, targetPath) {
+      let removed = false;
+      await app.fileManager.processFrontMatter(ownerFile, (frontmatter) => {
+        const current = toArray(frontmatter[propertyName]);
+        const filtered = current.filter((entry) => {
+          if (typeof entry !== "string") return true;
+          const dest = app.metadataCache.getFirstLinkpathDest(parseLinkText(entry), ownerFile.path);
+          return !(dest && dest.path === targetPath);
+        });
+        if (filtered.length === current.length) return;
+        if (filtered.length === 0) delete frontmatter[propertyName];
+        else frontmatter[propertyName] = filtered;
+        removed = true;
+      });
+      return removed;
+    }
+    function registerPropertyBacklinks2(plugin) {
+      const { app } = plugin;
+      const isEnabled = () => plugin.settings.propertyBacklinksLiveEnabled;
+      const propertyNames = () => plugin.settings.reciprocalLinkProperties;
+      const typOrder = () => plugin.settings.propertyBacklinksTypOrder;
+      const isNote = (file) => file instanceof TFile && file.extension === "md";
+      const stillExists = (file) => app.vault.getAbstractFileByPath(file.path) === file;
+      const before = /* @__PURE__ */ new Map();
+      let changeCount = 0;
+      const lastChange = /* @__PURE__ */ new Map();
+      const pairKey = (propertyName, ownerPath, linkPath) => `${propertyName}\0${ownerPath}\0${linkPath}`;
+      const isOutdated = (propertyName, ownerPath, linkPath, enqueuedAt) => (lastChange.get(pairKey(propertyName, ownerPath, linkPath)) ?? 0) > enqueuedAt;
+      const queue = [];
+      let timer = null;
+      let running = false;
+      const flush = async () => {
+        timer = null;
+        if (running) {
+          schedule();
+          return;
+        }
+        running = true;
+        try {
+          for (const job of queue.splice(0)) {
+            if (!isEnabled()) break;
+            try {
+              await job();
+            } catch (e) {
+              console.error("[Property-Backlinking] Fehler:", e);
+            }
+          }
+        } finally {
+          running = false;
+        }
+        if (queue.length === 0) lastChange.clear();
+      };
+      const schedule = () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(flush, WRITE_DELAY_MS);
+      };
+      plugin.register(() => window.clearTimeout(timer));
+      const enqueue = (job) => {
+        queue.push(job);
+        schedule();
+      };
+      const mirrorAdd = (propertyName, sourceFile, targetPath, enqueuedAt) => enqueue(async () => {
+        if (isOutdated(propertyName, targetPath, sourceFile.path, enqueuedAt)) return;
+        const targetFile = app.vault.getAbstractFileByPath(targetPath);
+        if (!(targetFile instanceof TFile) || !stillExists(sourceFile)) return;
+        if (await addLinkToProperty(app, propertyName, targetFile, sourceFile, typOrder())) {
+          console.log(`[Property-Backlinking] "${propertyName}": ${targetFile.path} <- ${sourceFile.path} erg\xE4nzt`);
+        }
+      });
+      const mirrorRemove = (propertyName, sourceFile, targetPath, enqueuedAt) => enqueue(async () => {
+        if (isOutdated(propertyName, targetPath, sourceFile.path, enqueuedAt)) return;
+        const targetFile = app.vault.getAbstractFileByPath(targetPath);
+        if (!(targetFile instanceof TFile)) return;
+        if (await removeLinkFromProperty(app, propertyName, targetFile, sourceFile.path)) {
+          console.log(`[Property-Backlinking] "${propertyName}": ${targetFile.path} <- ${sourceFile.path} entfernt`);
+        }
+      });
+      const addMissingBacklinks = async (onlyTargets = null) => {
+        const names = propertyNames();
+        let added = 0;
+        for (const sourceFile of app.vault.getMarkdownFiles()) {
+          const frontmatter = app.metadataCache.getFileCache(sourceFile)?.frontmatter;
+          const targets = linkTargetsByProperty(app, sourceFile, frontmatter, names);
+          for (const propertyName of names) {
+            for (const targetPath of targets[propertyName]) {
+              if (onlyTargets && !onlyTargets.has(targetPath)) continue;
+              const targetFile = app.vault.getAbstractFileByPath(targetPath);
+              if (!(targetFile instanceof TFile)) continue;
+              if (await addLinkToProperty(app, propertyName, targetFile, sourceFile, typOrder())) {
+                console.log(`[Property-Backlinking] "${propertyName}": ${targetFile.path} <- ${sourceFile.path} erg\xE4nzt`);
+                added++;
+              }
+            }
+          }
+        }
+        return added;
+      };
+      const onModify = (file) => {
+        if (!isEnabled() || !isNote(file)) return;
+        const cache = app.metadataCache.getFileCache(file);
+        if (cache) before.set(file.path, linkTargetsByProperty(app, file, cache.frontmatter, propertyNames()));
+      };
+      const onChanged = (file, _data, cache) => {
+        if (!isEnabled() || !isNote(file)) return;
+        const previous = before.get(file.path);
+        before.delete(file.path);
+        const names = propertyNames();
+        const current = linkTargetsByProperty(app, file, cache?.frontmatter, names);
+        for (const propertyName of names) {
+          const previousTargets = previous?.[propertyName];
+          const added = [...current[propertyName]].filter((path) => !previousTargets?.has(path));
+          const removed = previousTargets ? [...previousTargets].filter((path) => !current[propertyName].has(path)) : [];
+          if (previousTargets) {
+            for (const path of [...added, ...removed]) lastChange.set(pairKey(propertyName, file.path, path), ++changeCount);
+          }
+          for (const path of added) mirrorAdd(propertyName, file, path, changeCount);
+          for (const path of removed) mirrorRemove(propertyName, file, path, changeCount);
+        }
+      };
+      const appeared = /* @__PURE__ */ new Set();
+      const addBacklinksToAppeared = async () => {
+        if (appeared.size === 0) return;
+        const paths = new Set([...appeared].map((f) => f.path));
+        appeared.clear();
+        await addMissingBacklinks(paths);
+      };
+      const onFileAppeared = (file) => {
+        if (!isEnabled() || !app.workspace.layoutReady || !isNote(file)) return;
+        appeared.add(file);
+        enqueue(addBacklinksToAppeared);
+      };
+      plugin.registerEvent(app.vault.on("modify", onModify));
+      plugin.registerEvent(app.metadataCache.on("changed", onChanged));
+      plugin.registerEvent(app.vault.on("create", onFileAppeared));
+      plugin.registerEvent(
+        app.vault.on("rename", (file, oldPath) => {
+          if (before.has(oldPath)) {
+            before.set(file.path, before.get(oldPath));
+            before.delete(oldPath);
+          }
+          onFileAppeared(file);
+        })
+      );
+      plugin.registerEvent(app.vault.on("delete", (file) => before.delete(file.path)));
+      return () => enqueue(async () => {
+        const added = await addMissingBacklinks();
+        new Notice(`Property-Backlinking: ${added} Backlink${added === 1 ? "" : "s"} erg\xE4nzt.`);
+      });
+    }
+    module2.exports = { registerPropertyBacklinks: registerPropertyBacklinks2 };
   }
 });
 
@@ -2364,7 +2399,7 @@ var { Plugin } = require("obsidian");
 var { DEFAULT_SETTINGS, FredSettingTab } = require_settings();
 var { registerCommands } = require_commands();
 var { registerDatabaseFolders } = require_database_folders();
-var { registerPropertyBacklinksLive } = require_property_sync();
+var { registerPropertyBacklinks } = require_property_sync();
 var { registerNestedCheckboxSync } = require_nested_checkboxes();
 var { registerImportantPlugins } = require_important_plugins();
 var { registerItalicUnderscore } = require_italic_underscore();
@@ -2376,7 +2411,7 @@ module.exports = class FredPlugin extends Plugin {
     registerCommands(this);
     this.addSettingTab(new FredSettingTab(this.app, this));
     this.updateDatabaseFolderStyle = registerDatabaseFolders(this);
-    this.runPropertyBacklinkSync = registerPropertyBacklinksLive(this);
+    this.addMissingPropertyBacklinks = registerPropertyBacklinks(this);
     registerNestedCheckboxSync(this);
     this.refreshImportantPluginCommands = registerImportantPlugins(this);
     registerItalicUnderscore(this);
@@ -2388,6 +2423,7 @@ module.exports = class FredPlugin extends Plugin {
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    delete this.settings.declaredLinkPairs;
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -2398,9 +2434,7 @@ module.exports = class FredPlugin extends Plugin {
   // saveSettings(). Einen offenen Settings-Tab baut Obsidian danach selbst neu
   // auf (settingTab.update()).
   async onExternalSettingsChange() {
-    const { declaredLinkPairs } = this.settings;
     await this.loadSettings();
-    this.settings.declaredLinkPairs = declaredLinkPairs;
     this.updateDatabaseFolderStyle();
     this.updateBasesHasNote();
     this.updateStyleSettingsFilter();

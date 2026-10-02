@@ -24,7 +24,6 @@ const DEFAULT_SETTINGS = {
   italicUnderscoreEnabled: false,
   basesHasNoteEnabled: true,
   styleSettingsModifiedFilterEnabled: true,
-  declaredLinkPairs: {},
   // Siehe important-plugins.js: aktivierte Plugin-IDs, für die automatisch
   // je ein eigener "Einstellungen öffnen"-Befehl entsteht.
   importantPlugins: [],
@@ -131,7 +130,7 @@ class FredSettingTab extends PluginSettingTab {
           .setDesc(
             "Kommagetrennte Liste von Frontmatter-Properties mit Links zu anderen Notizen (z. B. Familie, Freunde) - gilt für alle Notizen, unabhängig vom TYP. Verlinkt eine Notiz hier eine andere, bekommt die andere automatisch den Backlink in derselben Property ergänzt - und wieder entfernt, sobald die Verlinkung wegfällt. Groß-/Kleinschreibung muss exakt zum Property-Namen passen."
           )
-          .addText((text) =>
+          .addText((text) => {
             text
               .setValue(this.plugin.settings.reciprocalLinkProperties.join(", "))
               .onChange(async (value) => {
@@ -140,19 +139,25 @@ class FredSettingTab extends PluginSettingTab {
                   .map((name) => name.trim())
                   .filter((name) => name.length > 0);
                 await this.plugin.saveSettings();
-              })
-          )
+              });
+            // Eine neu eingetragene Property einmal abgleichen - erst beim
+            // Verlassen des Felds ("change"), nicht bei jedem Tastendruck.
+            text.inputEl.addEventListener("change", () => {
+              if (this.plugin.settings.propertyBacklinksLiveEnabled) this.plugin.addMissingPropertyBacklinks();
+            });
+          })
       )
       .addSetting((setting) =>
         setting
-          .setName("Live aktualisieren")
+          .setName("Aktiv")
           .setDesc(
-            "Property-Backlinking sofort beim Speichern abgleichen, statt nur auf Befehl (\"Property-Backlinking aktualisieren\")."
+            "Spiegelt jede Änderung an diesen Properties sofort bei der verlinkten Notiz. Beim Einschalten werden alle fehlenden Backlinks ergänzt; ein Link, der entfernt wurde, während das Backlinking aus war, bleibt bei der verlinkten Notiz dagegen stehen."
           )
           .addToggle((toggle) =>
             toggle.setValue(this.plugin.settings.propertyBacklinksLiveEnabled).onChange(async (value) => {
               this.plugin.settings.propertyBacklinksLiveEnabled = value;
               await this.plugin.saveSettings();
+              if (value) this.plugin.addMissingPropertyBacklinks();
             })
           )
       )

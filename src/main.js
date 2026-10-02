@@ -2,7 +2,7 @@ const { Plugin } = require("obsidian");
 const { DEFAULT_SETTINGS, FredSettingTab } = require("./settings");
 const { registerCommands } = require("./commands");
 const { registerDatabaseFolders } = require("./database-folders");
-const { registerPropertyBacklinksLive } = require("./property-sync");
+const { registerPropertyBacklinks } = require("./property-sync");
 const { registerNestedCheckboxSync } = require("./nested-checkboxes");
 const { registerImportantPlugins } = require("./important-plugins");
 const { registerItalicUnderscore } = require("./italic-underscore");
@@ -15,7 +15,7 @@ module.exports = class FredPlugin extends Plugin {
     registerCommands(this);
     this.addSettingTab(new FredSettingTab(this.app, this));
     this.updateDatabaseFolderStyle = registerDatabaseFolders(this);
-    this.runPropertyBacklinkSync = registerPropertyBacklinksLive(this);
+    this.addMissingPropertyBacklinks = registerPropertyBacklinks(this);
     registerNestedCheckboxSync(this);
     this.refreshImportantPluginCommands = registerImportantPlugins(this);
     registerItalicUnderscore(this);
@@ -31,6 +31,9 @@ module.exports = class FredPlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    // Abgleichstand der früheren Property-Backlinking-Version (siehe
+    // property-sync.js) - wird nicht mehr gebraucht.
+    delete this.settings.declaredLinkPairs;
   }
 
   async saveSettings() {
@@ -43,13 +46,7 @@ module.exports = class FredPlugin extends Plugin {
   // saveSettings(). Einen offenen Settings-Tab baut Obsidian danach selbst neu
   // auf (settingTab.update()).
   async onExternalSettingsChange() {
-    // declaredLinkPairs ist der Abgleichstand DIESES Geräts und passt nur zu
-    // dessen Vault-Stand - mit dem eines anderen Geräts gälten Links fälschlich
-    // als neu oder weggefallen. Entfällt, sobald property-sync.js ohne
-    // gespeicherten Stand auskommt.
-    const { declaredLinkPairs } = this.settings;
     await this.loadSettings();
-    this.settings.declaredLinkPairs = declaredLinkPairs;
     this.updateDatabaseFolderStyle();
     this.updateBasesHasNote();
     this.updateStyleSettingsFilter();
