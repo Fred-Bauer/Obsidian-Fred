@@ -36,4 +36,23 @@ module.exports = class FredPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
+
+  // Ruft Obsidian auf, wenn data.json von außen geändert wurde - in der Praxis
+  // durch Obsidian Sync von einem anderen Gerät. Ohne das behielte dieses Gerät
+  // seine alten Settings im Speicher und überschriebe die neuen beim nächsten
+  // saveSettings(). Einen offenen Settings-Tab baut Obsidian danach selbst neu
+  // auf (settingTab.update()).
+  async onExternalSettingsChange() {
+    // declaredLinkPairs ist der Abgleichstand DIESES Geräts und passt nur zu
+    // dessen Vault-Stand - mit dem eines anderen Geräts gälten Links fälschlich
+    // als neu oder weggefallen. Entfällt, sobald property-sync.js ohne
+    // gespeicherten Stand auskommt.
+    const { declaredLinkPairs } = this.settings;
+    await this.loadSettings();
+    this.settings.declaredLinkPairs = declaredLinkPairs;
+    this.updateDatabaseFolderStyle();
+    this.updateBasesHasNote();
+    this.updateStyleSettingsFilter();
+    this.refreshImportantPluginCommands();
+  }
 };
