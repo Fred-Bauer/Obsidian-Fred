@@ -721,7 +721,7 @@ var require_kontakt_import = __commonJS({
       return app.plugins.plugins["typ-system"] ?? null;
     }
     function contactPropertyKeys(app, typ) {
-      const defaults = getTypSystem(app)?.getTypeDefaults?.(typ, { includeFloating: true });
+      const defaults = getTypSystem(app)?.getTypDefaults?.(typ, { includeFloating: true });
       const keys = defaults ? Object.keys(defaults) : null;
       return keys && keys.length > 0 ? keys : FALLBACK_CONTACT_KEYS;
     }
@@ -1040,7 +1040,7 @@ var require_kontakt_import = __commonJS({
       const typSystem = getTypSystem(app);
       await app.fileManager.processFrontMatter(file, (frontmatter) => {
         const subtyp = existingSubtyp(frontmatter);
-        if (typSystem?.applyTypeProperties) typSystem.applyTypeProperties(frontmatter, typ, subtyp);
+        if (typSystem?.applyTypProperties) typSystem.applyTypProperties(frontmatter, typ, subtyp);
         else frontmatter.TYP = typ;
         for (const change of changes) {
           if (change.to === void 0 || change.to === null || change.to === "") delete frontmatter[change.key];

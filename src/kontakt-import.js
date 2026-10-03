@@ -35,7 +35,7 @@ const COLUMN_MAPPING = {
 };
 
 // Fallback, falls das TYP-System nicht läuft - sonst ist
-// getTypeDefaults(TYP, { includeFloating: true }) die Quelle.
+// getTypDefaults(TYP, { includeFloating: true }) die Quelle.
 const FALLBACK_CONTACT_KEYS = [
   "Vorname",
   "Zweitname",
@@ -415,7 +415,7 @@ function getTypSystem(app) {
 // Die Feldliste kommt aus dem TYP-System, damit sie nur an einer Stelle
 // gepflegt werden muss. Läuft es nicht, greift die interne Liste.
 function contactPropertyKeys(app, typ) {
-  const defaults = getTypSystem(app)?.getTypeDefaults?.(typ, { includeFloating: true });
+  const defaults = getTypSystem(app)?.getTypDefaults?.(typ, { includeFloating: true });
   const keys = defaults ? Object.keys(defaults) : null;
   return keys && keys.length > 0 ? keys : FALLBACK_CONTACT_KEYS;
 }
@@ -859,7 +859,7 @@ function existingSubtyp(frontmatter) {
 // des TYP-Systems. Vorher fraßen sich beide gegenseitig auf: der Import
 // zog tags nach vorn, die Frontmatter-Sortierung wieder nach hinten.
 //
-// Der Subtyp muss dabei durchgereicht werden: applyTypeProperties(fm, typ,
+// Der Subtyp muss dabei durchgereicht werden: applyTypProperties(fm, typ,
 // null) LÖSCHT einen vorhandenen SUBTYP (siehe typ-system/src/main.js), und
 // sortFrontmatter ohne Subtyp kennt dessen Property-Block nicht und schöbe
 // die Subtyp-Properties ans Ende. Ein fest übergebenes null hätte deshalb,
@@ -870,7 +870,7 @@ async function writeFrontmatter(app, file, changes, typ) {
   await app.fileManager.processFrontMatter(file, (frontmatter) => {
     const subtyp = existingSubtyp(frontmatter);
 
-    if (typSystem?.applyTypeProperties) typSystem.applyTypeProperties(frontmatter, typ, subtyp);
+    if (typSystem?.applyTypProperties) typSystem.applyTypProperties(frontmatter, typ, subtyp);
     else frontmatter.TYP = typ;
 
     for (const change of changes) {
