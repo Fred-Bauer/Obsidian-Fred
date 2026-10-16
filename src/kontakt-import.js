@@ -1,19 +1,15 @@
-const { Notice, Modal, Setting, ButtonComponent } = require("obsidian");
+const { Notice } = require("obsidian");
 
 /* ============================================================
- * Kontakte-CSV-Import
+ * Kontakte aus der CSV - Soll-Zustand
  *
- * Arbeitet in zwei Schritten: erst wird der komplette Lauf
- * durchgerechnet (buildPlan), dann angewandt (applyPlan). Das
- * hält den Probelauf trivial (Plan bauen, nicht anwenden), macht
- * das Konflikt-Modal möglich (alle Abweichungen sind bekannt,
- * bevor irgendetwas geschrieben wird) und erlaubt dem Lösch-
- * Befehl, denselben Soll-Zustand zu benutzen.
- *
- * Geschrieben wird ausschließlich über fileManager.processFrontMatter
- * und die API des TYP-Systems - nie über adapter.write mit selbst
- * gebautem YAML. Sonst kämen sich Import und Frontmatter-Sortierung
- * bei jedem Lauf gegenseitig in die Quere.
+ * Der eigentliche Import ist ins Plugin Databridge umgezogen
+ * (Definition _obsidian/databridge/contacts.yaml). Übrig ist der
+ * Teil, der nichts schreibt: buildPlan rechnet aus der CSV den
+ * Soll-Zustand durch. Den braucht der Lösch-Befehl für
+ * "Unveränderte Kontakte löschen", und Databridges Parity-Tool
+ * lädt ihn über module.exports.__test, um beide Pläne zu
+ * vergleichen - buildPlan deshalb nicht verändern.
  * ============================================================ */
 
 const MULTI_VALUE_SEPARATOR = " ::: ";
@@ -710,238 +706,6 @@ async function buildPlan(plugin) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Konflikt-Modal                                                      */
-/* ------------------------------------------------------------------ */
-
-function formatValue(value) {
-  if (value === undefined || value === null || value === "") return "—";
-  return Array.isArray(value) ? value.join(", ") : String(value);
-}
-
-// Ein Dialog je betroffenem Kontakt. "Rest automatisch" bricht die Kette
-// ab, damit ein Lauf mit vielen Abweichungen nicht zum Klickmarathon wird.
-class ConflictModal extends Modal {
-  constructor(app, action, resolve) {
-    super(app);
-    this.action = action;
-    this.resolve = resolve;
-    this.accepted = new Set(action.conflicts.map((c) => c.key));
-    this.answered = false;
-  }
-
-  onOpen() {
-    const { contentEl, action } = this;
-    contentEl.addClass("fred-kontakt-conflict");
-    contentEl.createEl("h3", { text: action.contact.baseName });
-    contentEl.createEl("p", {
-      cls: "setting-item-description",
-      text: `${action.conflicts.length} abweichende ${
-        action.conflicts.length === 1 ? "Property" : "Properties"
-      }. Angehakt wird der CSV-Wert übernommen.`,
-    });
-
-    for (const conflict of action.conflicts) {
-      const isRemoval = conflict.to === undefined;
-      new Setting(contentEl)
-        .setName(conflict.key + (isRemoval ? "  (in Google gelöscht)" : ""))
-        .setDesc(
-          isRemoval
-            ? `Notiz: ${formatValue(conflict.from)}   →   aus der Notiz entfernen`
-            : `Notiz: ${formatValue(conflict.from)}   →   CSV: ${formatValue(conflict.to)}`
-        )
-        .addToggle((toggle) =>
-          toggle.setValue(true).onChange((value) => {
-            if (value) this.accepted.add(conflict.key);
-            else this.accepted.delete(conflict.key);
-          })
-        );
-    }
-
-    // Nicht als Setting-Zeile: vier Knöpfe nebeneinander sprengen deren
-    // nicht umbrechende Control-Spalte und erzwingen horizontales Scrollen.
-    // Obsidians modal-button-container darf dagegen umbrechen.
-    const footer = contentEl.createDiv({ cls: "modal-button-container fred-kontakt-conflict-buttons" });
-    const button = (text, cta, onClick) => {
-      const btn = new ButtonComponent(footer).setButtonText(text).onClick(onClick);
-      if (cta) btn.setCta();
-      return btn;
-    };
-    button("Übernehmen", true, () => this.finish({ accepted: this.accepted }));
-    button("Notiz behalten", false, () => this.finish({ accepted: new Set() }));
-    button("Rest: CSV", false, () => this.finish({ accepted: this.accepted, restMode: "csv" }));
-    button("Rest: Notiz", false, () => this.finish({ accepted: new Set(), restMode: "gaps" }));
-  }
-
-  finish(result) {
-    this.answered = true;
-    this.resolve(result);
-    this.close();
-  }
-
-  onClose() {
-    this.contentEl.empty();
-    if (!this.answered) this.resolve({ accepted: new Set() });
-  }
-}
-
-function askConflicts(app, action) {
-  return new Promise((resolve) => new ConflictModal(app, action, resolve).open());
-}
-
-// Konflikte gemäß Modus auflösen und in die normale Änderungsliste
-// überführen, damit applyPlan nur noch eine Sorte Änderung kennt.
-async function resolveConflicts(plugin, actions) {
-  let mode = plugin.settings.contactsConflictMode || "csv";
-  for (const action of actions) {
-    if (action.conflicts.length === 0) continue;
-    if (mode === "csv") {
-      action.changes.push(...action.conflicts);
-    } else if (mode === "ask") {
-      const { accepted, restMode } = await askConflicts(plugin.app, action);
-      action.changes.push(...action.conflicts.filter((c) => accepted.has(c.key)));
-      if (restMode) mode = restMode;
-    }
-    action.conflicts = [];
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Fortschritt in der Statusleiste                                     */
-/* ------------------------------------------------------------------ */
-
-// Bewusst die Statusleiste statt einer Notice: so bleibt der Notice-Bereich
-// frei für die Meldungen über Normalisierungen und Übersprungenes.
-function createProgress(plugin, total) {
-  const el = plugin.addStatusBarItem();
-  el.addClass("fred-kontakt-progress");
-  const label = el.createSpan({ cls: "fred-kontakt-progress-label" });
-  const cancelBtn = el.createEl("span", { cls: "fred-kontakt-progress-cancel", text: "Abbrechen" });
-
-  const state = {
-    cancelled: false,
-    update(done, name) {
-      const width = 12;
-      const filled = total > 0 ? Math.round((width * done) / total) : width;
-      const bar = "█".repeat(filled) + "░".repeat(Math.max(0, width - filled));
-      label.setText(`Kontakte ${bar} ${done}/${total}${name ? "  ·  " + name : ""}`);
-    },
-    finish() {
-      el.remove();
-    },
-  };
-
-  cancelBtn.addEventListener("click", () => {
-    state.cancelled = true;
-    cancelBtn.setText("wird abgebrochen …");
-  });
-
-  state.update(0, "");
-  return state;
-}
-
-/* ------------------------------------------------------------------ */
-/* Schreiben                                                           */
-/* ------------------------------------------------------------------ */
-
-// Der SUBTYP gehört der Notiz, nicht dem Import: er kommt aus dem TYP-System
-// oder von Hand, steht in keiner CSV-Spalte und darf einen Import unverändert
-// überstehen. Gelesen wird er ohne Beachtung der Groß-/Kleinschreibung, weil
-// Obsidian Property-Namen so behandelt ("Subtyp" und "SUBTYP" sind dieselbe
-// Property) - genau wie das TYP-System es beim Schreiben tut.
-function existingSubtyp(frontmatter) {
-  const key = Object.keys(frontmatter).find((name) => name.toLowerCase() === "subtyp");
-  const value = key === undefined ? undefined : frontmatter[key];
-  return typeof value === "string" && value.trim() !== "" ? value : null;
-}
-
-// Alles geht durch processFrontMatter und sortFrontmatter - der Import
-// bringt damit keine eigene Reihenfolge mehr mit, sondern übernimmt die
-// des TYP-Systems. Vorher fraßen sich beide gegenseitig auf: der Import
-// zog tags nach vorn, die Frontmatter-Sortierung wieder nach hinten.
-//
-// Der Subtyp muss dabei durchgereicht werden: applyTypProperties(fm, typ,
-// null) LÖSCHT einen vorhandenen SUBTYP (siehe typ-system/src/main.js), und
-// sortFrontmatter ohne Subtyp kennt dessen Property-Block nicht und schöbe
-// die Subtyp-Properties ans Ende. Ein fest übergebenes null hätte deshalb,
-// sobald KONTAKT Subtypen bekommt, bei jedem Update die Klassifizierung der
-// Notiz stillschweigend mitgelöscht.
-async function writeFrontmatter(app, file, changes, typ) {
-  const typSystem = getTypSystem(app);
-  await app.fileManager.processFrontMatter(file, (frontmatter) => {
-    const subtyp = existingSubtyp(frontmatter);
-
-    if (typSystem?.applyTypProperties) typSystem.applyTypProperties(frontmatter, typ, subtyp);
-    else frontmatter.TYP = typ;
-
-    for (const change of changes) {
-      if (change.to === undefined || change.to === null || change.to === "") delete frontmatter[change.key];
-      else frontmatter[change.key] = change.to;
-    }
-
-    typSystem?.sortFrontmatter?.(frontmatter, typ, subtyp);
-  });
-}
-
-async function ensureFolder(app, path) {
-  if (!path) return;
-  if (!(await app.vault.adapter.exists(path))) await app.vault.createFolder(path).catch(() => {});
-}
-
-async function applyPlan(plugin, plan, progress) {
-  const { app } = plugin;
-  const stats = { created: 0, updated: 0, renamed: 0, trashed: 0, errors: 0 };
-  const total = plan.actions.length + plan.orphans.length;
-  let done = 0;
-
-  for (const action of plan.actions) {
-    if (progress?.cancelled) break;
-    done++;
-    progress?.update(done, action.contact.baseName);
-
-    try {
-      if (action.kind === "create") {
-        await ensureFolder(app, plan.baseDir);
-        const file = await app.vault.create(action.targetPath, action.contact.body ? action.contact.body + "\n" : "");
-        await writeFrontmatter(app, file, action.changes, plan.typ);
-        stats.created++;
-        continue;
-      }
-
-      if (action.changes.length > 0) {
-        await writeFrontmatter(app, action.file, action.changes, plan.typ);
-        stats.updated++;
-      }
-      // Umbenennung zuletzt und über fileManager, damit Obsidian die
-      // eingehenden Familie-/Freunde-Links mitzieht.
-      if (action.rename) {
-        await app.fileManager.renameFile(action.file, action.rename);
-        stats.renamed++;
-      }
-    } catch (e) {
-      stats.errors++;
-      console.error("[Kontakt-Import] Fehler bei", action.contact.baseName, e);
-    }
-  }
-
-  for (const orphan of plan.orphans) {
-    if (progress?.cancelled) break;
-    done++;
-    progress?.update(done, orphan.file.basename);
-    try {
-      await ensureFolder(app, plan.trashDir);
-      await app.fileManager.renameFile(orphan.file, joinVaultPath(plan.trashDir, orphan.file.name));
-      stats.trashed++;
-    } catch (e) {
-      stats.errors++;
-      console.error("[Kontakt-Import] Fehler beim Verschieben nach _Trash:", orphan.file.path, e);
-    }
-  }
-
-  progress?.update(total, "");
-  return stats;
-}
-
-/* ------------------------------------------------------------------ */
 /* Bericht                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -952,101 +716,9 @@ function logGroup(title, lines) {
   console.groupEnd();
 }
 
-function reportPlan(plan, stats, dryRun) {
-  // Nach Feld gruppiert: bei dreistelligen Zahlen ist eine flache Liste
-  // nicht mehr lesbar, und die Aufschlüsselung sagt auf einen Blick, ob
-  // nur Telefonformate oder auch Adressen angefasst wurden.
-  const byField = new Map();
-  for (const c of plan.corrections) {
-    if (!byField.has(c.field)) byField.set(c.field, []);
-    byField.get(c.field).push(c);
-  }
-  const breakdown = [...byField.entries()].map(([field, list]) => `${list.length}× ${field}`);
-  logGroup(
-    `${plan.corrections.length} Normalisierungen (${breakdown.join(", ")})`,
-    [...byField.entries()].flatMap(([field, list]) => [
-      `── ${field} (${list.length})`,
-      ...list.map((c) => `   ${c.name}: "${c.from}" → "${c.to}"`),
-    ])
-  );
-  logGroup(
-    `${plan.skipped.length} übersprungen`,
-    plan.skipped.map((s) => `${s.name}: ${s.reason}`)
-  );
-  const renames = plan.actions.filter((a) => a.rename);
-  logGroup(
-    `${renames.length} Umbenennungen`,
-    renames.map((a) => `${a.file?.path ?? "(neu)"} → ${a.rename} (erkannt über ${a.via})`)
-  );
-  logGroup(
-    `${plan.orphans.length} nicht mehr in der CSV`,
-    plan.orphans.map((o) => o.file.path)
-  );
-  // Geleerte Properties gesondert ausweisen: das ist der einzige Fall, in
-  // dem der Import Daten aus einer Notiz entfernt.
-  const cleared = plan.actions.flatMap((a) =>
-    a.changes.filter((c) => c.to === undefined).map((c) => `${a.contact.baseName} – ${c.key}: "${formatValue(c.from)}" entfernt`)
-  );
-  logGroup(`${cleared.length} Properties geleert (in Google gelöscht)`, cleared);
-
-  const parts = [
-    `${stats.created} neu`,
-    `${stats.updated} aktualisiert`,
-    `${stats.renamed} umbenannt`,
-    `${stats.trashed} nach _Trash`,
-  ];
-  if (cleared.length) parts.push(`${cleared.length} geleert`);
-  if (plan.corrections.length) parts.push(`${plan.corrections.length} normalisiert`);
-  if (plan.skipped.length) parts.push(`${plan.skipped.length} übersprungen`);
-  if (stats.errors) parts.push(`${stats.errors} Fehler`);
-
-  const summary = `${dryRun ? "[Probelauf] " : ""}Kontakt-Import: ${parts.join(", ")}. Details in der Konsole.`;
-  console.log("[Kontakt-Import]", summary);
-  new Notice(summary, 10000);
-}
-
 /* ------------------------------------------------------------------ */
 /* Befehle                                                             */
 /* ------------------------------------------------------------------ */
-
-async function importContactsFromCsv(plugin) {
-  let plan;
-  try {
-    plan = await buildPlan(plugin);
-  } catch (e) {
-    new Notice(`Kontakt-Import: ${e.message}`);
-    console.error("[Kontakt-Import]", e);
-    return;
-  }
-
-  await resolveConflicts(plugin, plan.actions);
-
-  if (plugin.settings.contactsDryRun) {
-    reportPlan(
-      plan,
-      {
-        created: plan.actions.filter((a) => a.kind === "create").length,
-        updated: plan.actions.filter((a) => a.kind === "update" && a.changes.length > 0).length,
-        renamed: plan.actions.filter((a) => a.rename).length,
-        trashed: plan.orphans.length,
-        errors: 0,
-      },
-      true
-    );
-    return;
-  }
-
-  const progress = createProgress(plugin, plan.actions.length + plan.orphans.length);
-  let stats;
-  try {
-    stats = await applyPlan(plugin, plan, progress);
-  } finally {
-    progress.finish();
-  }
-
-  if (progress.cancelled) new Notice("Kontakt-Import: abgebrochen.");
-  reportPlan(plan, stats, false);
-}
 
 // Debugging-Hilfe: löscht Kontakte, die exakt so aussehen, wie der Import
 // sie gerade anlegen würde - also nachweislich von niemandem angefasst
@@ -1124,7 +796,7 @@ async function deleteUntouchedContacts(plugin) {
   );
 }
 
-module.exports = { importContactsFromCsv, deleteUntouchedContacts };
+module.exports = { deleteUntouchedContacts };
 
 // Nur für Tests außerhalb von Obsidian - die reine Rechenlogik lässt sich
 // so gegen die echte CSV prüfen, ohne den Vault anzufassen.

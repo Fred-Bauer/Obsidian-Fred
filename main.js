@@ -97,12 +97,11 @@ var require_settings = __commonJS({
       contactsBaseDir: "~Kontakte",
       contactsTyp: "KONTAKT",
       contactsTrashSubdir: "_Trash",
+      // Ohne Bedienelement: buildPlan liest es weiter, damit der Plan für
+      // Databridges Parity-Tool derselbe bleibt. Für den Lösch-Befehl egal.
       contactsEditOnly: false,
       contactsFilterRelevant: true,
       contactsNormalizeEnabled: true,
-      // "csv" = CSV gewinnt, "gaps" = nur leere Properties füllen,
-      // "ask" = je betroffenem Kontakt ein Dialog.
-      contactsConflictMode: "csv",
       contactsDryRun: false,
       databaseFoldersEnabled: true,
       databaseFolderPrefix: "~",
@@ -351,7 +350,11 @@ var require_settings = __commonJS({
         renderImportantPluginsList();
       }
       displayKontakteTab(containerEl) {
-        new SettingGroup(containerEl).setHeading("Kontaktimport").addSetting(
+        containerEl.createEl("p", {
+          cls: "setting-item-description",
+          text: "Der Kontaktimport ist ins Plugin Databridge umgezogen (Definition _obsidian/databridge/contacts.yaml). Hier bleibt nur der Befehl \u201EUnver\xE4nderte Kontakte l\xF6schen\u201C: er vergleicht die Notizen mit dem Stand, den die CSV erg\xE4be, und braucht daf\xFCr die Einstellungen unten."
+        });
+        new SettingGroup(containerEl).setHeading("Unver\xE4nderte Kontakte l\xF6schen").addSetting(
           (setting) => setting.setName("CSV-Datei").setDesc("Pfad zur Kontakte-CSV, relativ zum Vault-Root.").addText(
             (text) => text.setValue(this.plugin.settings.contactsCsvPath).onChange(async (value) => {
               this.plugin.settings.contactsCsvPath = value;
@@ -360,7 +363,7 @@ var require_settings = __commonJS({
           )
         ).addSetting(
           (setting) => setting.setName("Kontakte-Basisverzeichnis").setDesc(
-            "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Gro\xDF-/Kleinschreibung wird beim Abgleich ignoriert."
+            "Ordner der Kontakt-Notizen (relativ zum Vault-Root). Gro\xDF-/Kleinschreibung wird beim Abgleich ignoriert."
           ).addText(
             (text) => text.setValue(this.plugin.settings.contactsBaseDir).onChange(async (value) => {
               this.plugin.settings.contactsBaseDir = value;
@@ -369,7 +372,7 @@ var require_settings = __commonJS({
           )
         ).addSetting(
           (setting) => setting.setName("TYP der Kontakt-Notizen").setDesc(
-            "Bestimmt zugleich, aus welchem TYP-Frontmatter der Import seine Feldliste liest. L\xE4uft das TYP-System nicht, greift eine interne Liste."
+            "Bestimmt zugleich, aus welchem TYP-Frontmatter die Feldliste gelesen wird. L\xE4uft das TYP-System nicht, greift eine interne Liste."
           ).addText(
             (text) => text.setValue(this.plugin.settings.contactsTyp).onChange(async (value) => {
               this.plugin.settings.contactsTyp = value;
@@ -378,17 +381,10 @@ var require_settings = __commonJS({
           )
         ).addSetting(
           (setting) => setting.setName("Papierkorb-Unterordner").setDesc(
-            "Kontakte, zu denen keine CSV-Zeile mehr passt, wandern hierhin (innerhalb des Basisverzeichnisses). Eingehende Links bleiben dabei erhalten."
+            "Unterordner des Basisverzeichnisses mit aussortierten Kontakten; Notizen darin werden nie gel\xF6scht."
           ).addText(
             (text) => text.setValue(this.plugin.settings.contactsTrashSubdir).onChange(async (value) => {
               this.plugin.settings.contactsTrashSubdir = value;
-              await this.plugin.saveSettings();
-            })
-          )
-        ).addSetting(
-          (setting) => setting.setName("Nur bestehende Kontakte aktualisieren").setDesc("Wenn aktiv, werden keine neuen Kontakt-Notizen angelegt, nur bestehende aktualisiert.").addToggle(
-            (toggle) => toggle.setValue(this.plugin.settings.contactsEditOnly).onChange(async (value) => {
-              this.plugin.settings.contactsEditOnly = value;
               await this.plugin.saveSettings();
             })
           )
@@ -401,7 +397,7 @@ var require_settings = __commonJS({
           )
         ).addSetting(
           (setting) => setting.setName("Werte normalisieren").setDesc(
-            "Telefonnummern auf +49-Format (inkl. gesch\xFCtzter Leerzeichen), E-Mails klein, L\xE4nderk\xFCrzel ausgeschrieben, Hausnummern in deutsche Reihenfolge. Jede Korrektur wird in der Konsole protokolliert."
+            "Telefonnummern auf +49-Format (inkl. gesch\xFCtzter Leerzeichen), E-Mails klein, L\xE4nderk\xFCrzel ausgeschrieben, Hausnummern in deutsche Reihenfolge - so, wie der Import die Werte schreibt."
           ).addToggle(
             (toggle) => toggle.setValue(this.plugin.settings.contactsNormalizeEnabled).onChange(async (value) => {
               this.plugin.settings.contactsNormalizeEnabled = value;
@@ -409,17 +405,8 @@ var require_settings = __commonJS({
             })
           )
         ).addSetting(
-          (setting) => setting.setName("Bei abweichenden Werten").setDesc(
-            "Was passiert, wenn eine Notiz bereits einen anderen Wert hat als die CSV. Leere Properties werden immer gef\xFCllt, Tags immer zusammengef\xFChrt."
-          ).addDropdown(
-            (dropdown) => dropdown.addOption("csv", "CSV gewinnt").addOption("gaps", "Notiz behalten, nur L\xFCcken f\xFCllen").addOption("ask", "Pro Kontakt nachfragen").setValue(this.plugin.settings.contactsConflictMode).onChange(async (value) => {
-              this.plugin.settings.contactsConflictMode = value;
-              await this.plugin.saveSettings();
-            })
-          )
-        ).addSetting(
           (setting) => setting.setName("Probelauf").setDesc(
-            "Rechnet den Lauf komplett durch und meldet in der Konsole, was passieren w\xFCrde - schreibt aber nichts. Gilt f\xFCr beide Kontakt-Befehle."
+            "Meldet in der Konsole, welche Kontakte gel\xF6scht w\xFCrden - l\xF6scht aber nichts."
           ).addToggle(
             (toggle) => toggle.setValue(this.plugin.settings.contactsDryRun).onChange(async (value) => {
               this.plugin.settings.contactsDryRun = value;
@@ -439,7 +426,7 @@ var require_settings = __commonJS({
 // src/kontakt-import.js
 var require_kontakt_import = __commonJS({
   "src/kontakt-import.js"(exports2, module2) {
-    var { Notice, Modal, Setting, ButtonComponent } = require("obsidian");
+    var { Notice } = require("obsidian");
     var MULTI_VALUE_SEPARATOR = " ::: ";
     var IGNORED_LABELS = /* @__PURE__ */ new Set(["* myContacts", "* starred"]);
     var STARRED_LABEL = "* starred";
@@ -938,252 +925,11 @@ var require_kontakt_import = __commonJS({
       const orphans = index.notes.filter((entry) => !taken.has(entry.file.path) && !isInFolder(entry.file.path, trashDir));
       return { typ, baseDir, trashDir, contacts, actions, orphans, corrections, skipped, ownedKeys };
     }
-    function formatValue(value) {
-      if (value === void 0 || value === null || value === "") return "\u2014";
-      return Array.isArray(value) ? value.join(", ") : String(value);
-    }
-    var ConflictModal = class extends Modal {
-      constructor(app, action, resolve) {
-        super(app);
-        this.action = action;
-        this.resolve = resolve;
-        this.accepted = new Set(action.conflicts.map((c) => c.key));
-        this.answered = false;
-      }
-      onOpen() {
-        const { contentEl, action } = this;
-        contentEl.addClass("fred-kontakt-conflict");
-        contentEl.createEl("h3", { text: action.contact.baseName });
-        contentEl.createEl("p", {
-          cls: "setting-item-description",
-          text: `${action.conflicts.length} abweichende ${action.conflicts.length === 1 ? "Property" : "Properties"}. Angehakt wird der CSV-Wert \xFCbernommen.`
-        });
-        for (const conflict of action.conflicts) {
-          const isRemoval = conflict.to === void 0;
-          new Setting(contentEl).setName(conflict.key + (isRemoval ? "  (in Google gel\xF6scht)" : "")).setDesc(
-            isRemoval ? `Notiz: ${formatValue(conflict.from)}   \u2192   aus der Notiz entfernen` : `Notiz: ${formatValue(conflict.from)}   \u2192   CSV: ${formatValue(conflict.to)}`
-          ).addToggle(
-            (toggle) => toggle.setValue(true).onChange((value) => {
-              if (value) this.accepted.add(conflict.key);
-              else this.accepted.delete(conflict.key);
-            })
-          );
-        }
-        const footer = contentEl.createDiv({ cls: "modal-button-container fred-kontakt-conflict-buttons" });
-        const button = (text, cta, onClick) => {
-          const btn = new ButtonComponent(footer).setButtonText(text).onClick(onClick);
-          if (cta) btn.setCta();
-          return btn;
-        };
-        button("\xDCbernehmen", true, () => this.finish({ accepted: this.accepted }));
-        button("Notiz behalten", false, () => this.finish({ accepted: /* @__PURE__ */ new Set() }));
-        button("Rest: CSV", false, () => this.finish({ accepted: this.accepted, restMode: "csv" }));
-        button("Rest: Notiz", false, () => this.finish({ accepted: /* @__PURE__ */ new Set(), restMode: "gaps" }));
-      }
-      finish(result) {
-        this.answered = true;
-        this.resolve(result);
-        this.close();
-      }
-      onClose() {
-        this.contentEl.empty();
-        if (!this.answered) this.resolve({ accepted: /* @__PURE__ */ new Set() });
-      }
-    };
-    function askConflicts(app, action) {
-      return new Promise((resolve) => new ConflictModal(app, action, resolve).open());
-    }
-    async function resolveConflicts(plugin, actions) {
-      let mode = plugin.settings.contactsConflictMode || "csv";
-      for (const action of actions) {
-        if (action.conflicts.length === 0) continue;
-        if (mode === "csv") {
-          action.changes.push(...action.conflicts);
-        } else if (mode === "ask") {
-          const { accepted, restMode } = await askConflicts(plugin.app, action);
-          action.changes.push(...action.conflicts.filter((c) => accepted.has(c.key)));
-          if (restMode) mode = restMode;
-        }
-        action.conflicts = [];
-      }
-    }
-    function createProgress(plugin, total) {
-      const el = plugin.addStatusBarItem();
-      el.addClass("fred-kontakt-progress");
-      const label = el.createSpan({ cls: "fred-kontakt-progress-label" });
-      const cancelBtn = el.createEl("span", { cls: "fred-kontakt-progress-cancel", text: "Abbrechen" });
-      const state = {
-        cancelled: false,
-        update(done, name) {
-          const width = 12;
-          const filled = total > 0 ? Math.round(width * done / total) : width;
-          const bar = "\u2588".repeat(filled) + "\u2591".repeat(Math.max(0, width - filled));
-          label.setText(`Kontakte ${bar} ${done}/${total}${name ? "  \xB7  " + name : ""}`);
-        },
-        finish() {
-          el.remove();
-        }
-      };
-      cancelBtn.addEventListener("click", () => {
-        state.cancelled = true;
-        cancelBtn.setText("wird abgebrochen \u2026");
-      });
-      state.update(0, "");
-      return state;
-    }
-    function existingSubtyp(frontmatter) {
-      const key = Object.keys(frontmatter).find((name) => name.toLowerCase() === "subtyp");
-      const value = key === void 0 ? void 0 : frontmatter[key];
-      return typeof value === "string" && value.trim() !== "" ? value : null;
-    }
-    async function writeFrontmatter(app, file, changes, typ) {
-      const typSystem = getTypSystem(app);
-      await app.fileManager.processFrontMatter(file, (frontmatter) => {
-        const subtyp = existingSubtyp(frontmatter);
-        if (typSystem?.applyTypProperties) typSystem.applyTypProperties(frontmatter, typ, subtyp);
-        else frontmatter.TYP = typ;
-        for (const change of changes) {
-          if (change.to === void 0 || change.to === null || change.to === "") delete frontmatter[change.key];
-          else frontmatter[change.key] = change.to;
-        }
-        typSystem?.sortFrontmatter?.(frontmatter, typ, subtyp);
-      });
-    }
-    async function ensureFolder(app, path) {
-      if (!path) return;
-      if (!await app.vault.adapter.exists(path)) await app.vault.createFolder(path).catch(() => {
-      });
-    }
-    async function applyPlan(plugin, plan, progress) {
-      const { app } = plugin;
-      const stats = { created: 0, updated: 0, renamed: 0, trashed: 0, errors: 0 };
-      const total = plan.actions.length + plan.orphans.length;
-      let done = 0;
-      for (const action of plan.actions) {
-        if (progress?.cancelled) break;
-        done++;
-        progress?.update(done, action.contact.baseName);
-        try {
-          if (action.kind === "create") {
-            await ensureFolder(app, plan.baseDir);
-            const file = await app.vault.create(action.targetPath, action.contact.body ? action.contact.body + "\n" : "");
-            await writeFrontmatter(app, file, action.changes, plan.typ);
-            stats.created++;
-            continue;
-          }
-          if (action.changes.length > 0) {
-            await writeFrontmatter(app, action.file, action.changes, plan.typ);
-            stats.updated++;
-          }
-          if (action.rename) {
-            await app.fileManager.renameFile(action.file, action.rename);
-            stats.renamed++;
-          }
-        } catch (e) {
-          stats.errors++;
-          console.error("[Kontakt-Import] Fehler bei", action.contact.baseName, e);
-        }
-      }
-      for (const orphan of plan.orphans) {
-        if (progress?.cancelled) break;
-        done++;
-        progress?.update(done, orphan.file.basename);
-        try {
-          await ensureFolder(app, plan.trashDir);
-          await app.fileManager.renameFile(orphan.file, joinVaultPath(plan.trashDir, orphan.file.name));
-          stats.trashed++;
-        } catch (e) {
-          stats.errors++;
-          console.error("[Kontakt-Import] Fehler beim Verschieben nach _Trash:", orphan.file.path, e);
-        }
-      }
-      progress?.update(total, "");
-      return stats;
-    }
     function logGroup(title, lines) {
       if (lines.length === 0) return;
       console.groupCollapsed(`[Kontakt-Import] ${title}`);
       for (const line of lines) console.log(line);
       console.groupEnd();
-    }
-    function reportPlan(plan, stats, dryRun) {
-      const byField = /* @__PURE__ */ new Map();
-      for (const c of plan.corrections) {
-        if (!byField.has(c.field)) byField.set(c.field, []);
-        byField.get(c.field).push(c);
-      }
-      const breakdown = [...byField.entries()].map(([field, list]) => `${list.length}\xD7 ${field}`);
-      logGroup(
-        `${plan.corrections.length} Normalisierungen (${breakdown.join(", ")})`,
-        [...byField.entries()].flatMap(([field, list]) => [
-          `\u2500\u2500 ${field} (${list.length})`,
-          ...list.map((c) => `   ${c.name}: "${c.from}" \u2192 "${c.to}"`)
-        ])
-      );
-      logGroup(
-        `${plan.skipped.length} \xFCbersprungen`,
-        plan.skipped.map((s) => `${s.name}: ${s.reason}`)
-      );
-      const renames = plan.actions.filter((a) => a.rename);
-      logGroup(
-        `${renames.length} Umbenennungen`,
-        renames.map((a) => `${a.file?.path ?? "(neu)"} \u2192 ${a.rename} (erkannt \xFCber ${a.via})`)
-      );
-      logGroup(
-        `${plan.orphans.length} nicht mehr in der CSV`,
-        plan.orphans.map((o) => o.file.path)
-      );
-      const cleared = plan.actions.flatMap(
-        (a) => a.changes.filter((c) => c.to === void 0).map((c) => `${a.contact.baseName} \u2013 ${c.key}: "${formatValue(c.from)}" entfernt`)
-      );
-      logGroup(`${cleared.length} Properties geleert (in Google gel\xF6scht)`, cleared);
-      const parts = [
-        `${stats.created} neu`,
-        `${stats.updated} aktualisiert`,
-        `${stats.renamed} umbenannt`,
-        `${stats.trashed} nach _Trash`
-      ];
-      if (cleared.length) parts.push(`${cleared.length} geleert`);
-      if (plan.corrections.length) parts.push(`${plan.corrections.length} normalisiert`);
-      if (plan.skipped.length) parts.push(`${plan.skipped.length} \xFCbersprungen`);
-      if (stats.errors) parts.push(`${stats.errors} Fehler`);
-      const summary = `${dryRun ? "[Probelauf] " : ""}Kontakt-Import: ${parts.join(", ")}. Details in der Konsole.`;
-      console.log("[Kontakt-Import]", summary);
-      new Notice(summary, 1e4);
-    }
-    async function importContactsFromCsv(plugin) {
-      let plan;
-      try {
-        plan = await buildPlan(plugin);
-      } catch (e) {
-        new Notice(`Kontakt-Import: ${e.message}`);
-        console.error("[Kontakt-Import]", e);
-        return;
-      }
-      await resolveConflicts(plugin, plan.actions);
-      if (plugin.settings.contactsDryRun) {
-        reportPlan(
-          plan,
-          {
-            created: plan.actions.filter((a) => a.kind === "create").length,
-            updated: plan.actions.filter((a) => a.kind === "update" && a.changes.length > 0).length,
-            renamed: plan.actions.filter((a) => a.rename).length,
-            trashed: plan.orphans.length,
-            errors: 0
-          },
-          true
-        );
-        return;
-      }
-      const progress = createProgress(plugin, plan.actions.length + plan.orphans.length);
-      let stats;
-      try {
-        stats = await applyPlan(plugin, plan, progress);
-      } finally {
-        progress.finish();
-      }
-      if (progress.cancelled) new Notice("Kontakt-Import: abgebrochen.");
-      reportPlan(plan, stats, false);
     }
     async function deleteUntouchedContacts(plugin) {
       const { app } = plugin;
@@ -1236,7 +982,7 @@ var require_kontakt_import = __commonJS({
         `Kontakt-Import: ${index.notes.length} gepr\xFCft, ${deleted} unver\xE4nderte gel\xF6scht${errors ? `, ${errors} Fehler` : ""}.`
       );
     }
-    module2.exports = { importContactsFromCsv, deleteUntouchedContacts };
+    module2.exports = { deleteUntouchedContacts };
     module2.exports.__test = { buildPlan, normalizePhone, normalizeStreet, normalizeCountry, normalizeBirthday };
   }
 });
@@ -1244,14 +990,9 @@ var require_kontakt_import = __commonJS({
 // src/commands.js
 var require_commands = __commonJS({
   "src/commands.js"(exports2, module2) {
-    var { importContactsFromCsv, deleteUntouchedContacts } = require_kontakt_import();
+    var { deleteUntouchedContacts } = require_kontakt_import();
     var { openImportantPluginSettingsPicker } = require_important_plugins();
     function registerCommands2(plugin) {
-      plugin.addCommand({
-        id: "kontakte-csv-import",
-        name: "KONTAKTE - Kontakte aus CSV aktualisieren",
-        callback: () => importContactsFromCsv(plugin)
-      });
       plugin.addCommand({
         id: "kontakte-unveraendert-loeschen",
         name: "KONTAKTE - Unver\xE4nderte Kontakte l\xF6schen",

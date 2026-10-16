@@ -6,12 +6,11 @@ const DEFAULT_SETTINGS = {
   contactsBaseDir: "~Kontakte",
   contactsTyp: "KONTAKT",
   contactsTrashSubdir: "_Trash",
+  // Ohne Bedienelement: buildPlan liest es weiter, damit der Plan für
+  // Databridges Parity-Tool derselbe bleibt. Für den Lösch-Befehl egal.
   contactsEditOnly: false,
   contactsFilterRelevant: true,
   contactsNormalizeEnabled: true,
-  // "csv" = CSV gewinnt, "gaps" = nur leere Properties füllen,
-  // "ask" = je betroffenem Kontakt ein Dialog.
-  contactsConflictMode: "csv",
   contactsDryRun: false,
   databaseFoldersEnabled: true,
   databaseFolderPrefix: "~",
@@ -375,8 +374,12 @@ class FredSettingTab extends PluginSettingTab {
   }
 
   displayKontakteTab(containerEl) {
+    containerEl.createEl("p", {
+      cls: "setting-item-description",
+      text: "Der Kontaktimport ist ins Plugin Databridge umgezogen (Definition _obsidian/databridge/contacts.yaml). Hier bleibt nur der Befehl „Unveränderte Kontakte löschen“: er vergleicht die Notizen mit dem Stand, den die CSV ergäbe, und braucht dafür die Einstellungen unten.",
+    });
     new SettingGroup(containerEl)
-      .setHeading("Kontaktimport")
+      .setHeading("Unveränderte Kontakte löschen")
       .addSetting((setting) =>
         setting
           .setName("CSV-Datei")
@@ -392,7 +395,7 @@ class FredSettingTab extends PluginSettingTab {
         setting
           .setName("Kontakte-Basisverzeichnis")
           .setDesc(
-            "Alle Kontakte landen flach direkt in diesem Ordner (relativ zum Vault-Root). Groß-/Kleinschreibung wird beim Abgleich ignoriert."
+            "Ordner der Kontakt-Notizen (relativ zum Vault-Root). Groß-/Kleinschreibung wird beim Abgleich ignoriert."
           )
           .addText((text) =>
             text.setValue(this.plugin.settings.contactsBaseDir).onChange(async (value) => {
@@ -405,7 +408,7 @@ class FredSettingTab extends PluginSettingTab {
         setting
           .setName("TYP der Kontakt-Notizen")
           .setDesc(
-            "Bestimmt zugleich, aus welchem TYP-Frontmatter der Import seine Feldliste liest. Läuft das TYP-System nicht, greift eine interne Liste."
+            "Bestimmt zugleich, aus welchem TYP-Frontmatter die Feldliste gelesen wird. Läuft das TYP-System nicht, greift eine interne Liste."
           )
           .addText((text) =>
             text.setValue(this.plugin.settings.contactsTyp).onChange(async (value) => {
@@ -418,22 +421,11 @@ class FredSettingTab extends PluginSettingTab {
         setting
           .setName("Papierkorb-Unterordner")
           .setDesc(
-            "Kontakte, zu denen keine CSV-Zeile mehr passt, wandern hierhin (innerhalb des Basisverzeichnisses). Eingehende Links bleiben dabei erhalten."
+            "Unterordner des Basisverzeichnisses mit aussortierten Kontakten; Notizen darin werden nie gelöscht."
           )
           .addText((text) =>
             text.setValue(this.plugin.settings.contactsTrashSubdir).onChange(async (value) => {
               this.plugin.settings.contactsTrashSubdir = value;
-              await this.plugin.saveSettings();
-            })
-          )
-      )
-      .addSetting((setting) =>
-        setting
-          .setName("Nur bestehende Kontakte aktualisieren")
-          .setDesc("Wenn aktiv, werden keine neuen Kontakt-Notizen angelegt, nur bestehende aktualisiert.")
-          .addToggle((toggle) =>
-            toggle.setValue(this.plugin.settings.contactsEditOnly).onChange(async (value) => {
-              this.plugin.settings.contactsEditOnly = value;
               await this.plugin.saveSettings();
             })
           )
@@ -453,7 +445,7 @@ class FredSettingTab extends PluginSettingTab {
         setting
           .setName("Werte normalisieren")
           .setDesc(
-            "Telefonnummern auf +49-Format (inkl. geschützter Leerzeichen), E-Mails klein, Länderkürzel ausgeschrieben, Hausnummern in deutsche Reihenfolge. Jede Korrektur wird in der Konsole protokolliert."
+            "Telefonnummern auf +49-Format (inkl. geschützter Leerzeichen), E-Mails klein, Länderkürzel ausgeschrieben, Hausnummern in deutsche Reihenfolge - so, wie der Import die Werte schreibt."
           )
           .addToggle((toggle) =>
             toggle.setValue(this.plugin.settings.contactsNormalizeEnabled).onChange(async (value) => {
@@ -464,27 +456,9 @@ class FredSettingTab extends PluginSettingTab {
       )
       .addSetting((setting) =>
         setting
-          .setName("Bei abweichenden Werten")
-          .setDesc(
-            "Was passiert, wenn eine Notiz bereits einen anderen Wert hat als die CSV. Leere Properties werden immer gefüllt, Tags immer zusammengeführt."
-          )
-          .addDropdown((dropdown) =>
-            dropdown
-              .addOption("csv", "CSV gewinnt")
-              .addOption("gaps", "Notiz behalten, nur Lücken füllen")
-              .addOption("ask", "Pro Kontakt nachfragen")
-              .setValue(this.plugin.settings.contactsConflictMode)
-              .onChange(async (value) => {
-                this.plugin.settings.contactsConflictMode = value;
-                await this.plugin.saveSettings();
-              })
-          )
-      )
-      .addSetting((setting) =>
-        setting
           .setName("Probelauf")
           .setDesc(
-            "Rechnet den Lauf komplett durch und meldet in der Konsole, was passieren würde - schreibt aber nichts. Gilt für beide Kontakt-Befehle."
+            "Meldet in der Konsole, welche Kontakte gelöscht würden - löscht aber nichts."
           )
           .addToggle((toggle) =>
             toggle.setValue(this.plugin.settings.contactsDryRun).onChange(async (value) => {
