@@ -22,6 +22,8 @@ const DEFAULT_SETTINGS = {
   nestedCheckboxSyncEnabled: false,
   italicUnderscoreEnabled: false,
   basesHasNoteEnabled: true,
+  propertyImageEnabled: false,
+  propertyImageName: "Cover",
   styleSettingsModifiedFilterEnabled: true,
   // Siehe important-plugins.js: aktivierte Plugin-IDs, für die automatisch
   // je ein eigener "Einstellungen öffnen"-Befehl entsteht.
@@ -202,6 +204,35 @@ class FredSettingTab extends PluginSettingTab {
             toggle.setValue(this.plugin.settings.italicUnderscoreEnabled).onChange(async (value) => {
               this.plugin.settings.italicUnderscoreEnabled = value;
               await this.plugin.saveSettings();
+            })
+          )
+      );
+
+    new SettingGroup(containerEl)
+      .setHeading("Properties")
+      .addSetting((setting) =>
+        setting
+          .setName("Property als Bild für CSS")
+          .setDesc(
+            'Stellt den Wert der Property als Bild für CSS-Snippets bereit, ohne selbst etwas anzuzeigen: Die Notiz-Ansicht bekommt die Variable --fred-image: url(…) und das Attribut data-fred-image. Wert: eine URL, ein Link/Embed auf ein Bild im Vault oder ein Vault-Pfad (bei einer Liste der erste Eintrag). Nur normale Notiz-Tabs.'
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.propertyImageEnabled).onChange(async (value) => {
+              this.plugin.settings.propertyImageEnabled = value;
+              await this.plugin.saveSettings();
+              this.plugin.updatePropertyImage?.();
+            })
+          )
+      )
+      .addSetting((setting) =>
+        setting
+          .setName("Property-Name")
+          .setDesc("Groß-/Kleinschreibung egal, wie bei Obsidian.")
+          .addText((text) =>
+            text.setValue(this.plugin.settings.propertyImageName).onChange(async (value) => {
+              this.plugin.settings.propertyImageName = value;
+              await this.plugin.saveSettings();
+              this.plugin.updatePropertyImage?.();
             })
           )
       );

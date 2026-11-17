@@ -30,6 +30,17 @@ Reziproke Verlinkung über beliebige Frontmatter-Properties (z. B. `Familie`), u
 
 Einstellungen: **Generell** → *Property-Backlinking*.
 
+## Property als Bild für CSS
+
+Stellt den Wert einer Property (Standard: `Cover`) als Bild für CSS-Snippets bereit – fred zeigt selbst nichts an, das Styling liegt komplett in Snippets. Jeder Notiz-Tab, dessen Notiz die Property mit einem Wert hat, bekommt an seiner Ansicht (`.workspace-leaf-content`):
+
+- `--fred-image: url("…")` – z. B. für `background-image`
+- `data-fred-image` – als Marker für Selektoren
+
+Als Wert zählen eine URL (`https://…`), ein Link oder Embed auf ein Bild im Vault (`[[cover.jpg]]`, `![[cover.jpg|200]]`) oder ein Vault-Pfad; bei einer Liste der erste Eintrag. Aktualisiert sich beim Notizwechsel und wenn sich die Property ändert. Nur normale Notiz-Tabs (Bearbeiten und Lesen), keine Hover-Vorschauen oder eingebetteten Notizen. Zusammen mit `data-typ`/`data-subtyp` aus dem TYP-System lässt sich das pro TYP gestalten (Beispiel: Snippet `TYP-MEDIA.css`).
+
+Einstellungen: **Generell** → *Properties* (Schalter + Property-Name, Groß-/Kleinschreibung egal).
+
 ## Bases: Property `file.hasNote`
 
 Stellt in Bases eine zusätzliche Datei-Property `file.hasNote` bereit - implementiert wie die eingebauten `file.embeds`/`file.tags`, also rein virtuell, ohne irgendetwas ins Frontmatter zu schreiben:

@@ -113,6 +113,8 @@ var require_settings = __commonJS({
       nestedCheckboxSyncEnabled: false,
       italicUnderscoreEnabled: false,
       basesHasNoteEnabled: true,
+      propertyImageEnabled: false,
+      propertyImageName: "Cover",
       styleSettingsModifiedFilterEnabled: true,
       // Siehe important-plugins.js: aktivierte Plugin-IDs, für die automatisch
       // je ein eigener "Einstellungen öffnen"-Befehl entsteht.
@@ -237,6 +239,25 @@ var require_settings = __commonJS({
             (toggle) => toggle.setValue(this.plugin.settings.italicUnderscoreEnabled).onChange(async (value) => {
               this.plugin.settings.italicUnderscoreEnabled = value;
               await this.plugin.saveSettings();
+            })
+          )
+        );
+        new SettingGroup(containerEl).setHeading("Properties").addSetting(
+          (setting) => setting.setName("Property als Bild f\xFCr CSS").setDesc(
+            "Stellt den Wert der Property als Bild f\xFCr CSS-Snippets bereit, ohne selbst etwas anzuzeigen: Die Notiz-Ansicht bekommt die Variable --fred-image: url(\u2026) und das Attribut data-fred-image. Wert: eine URL, ein Link/Embed auf ein Bild im Vault oder ein Vault-Pfad (bei einer Liste der erste Eintrag). Nur normale Notiz-Tabs."
+          ).addToggle(
+            (toggle) => toggle.setValue(this.plugin.settings.propertyImageEnabled).onChange(async (value) => {
+              this.plugin.settings.propertyImageEnabled = value;
+              await this.plugin.saveSettings();
+              this.plugin.updatePropertyImage?.();
+            })
+          )
+        ).addSetting(
+          (setting) => setting.setName("Property-Name").setDesc("Gro\xDF-/Kleinschreibung egal, wie bei Obsidian.").addText(
+            (text) => text.setValue(this.plugin.settings.propertyImageName).onChange(async (value) => {
+              this.plugin.settings.propertyImageName = value;
+              await this.plugin.saveSettings();
+              this.plugin.updatePropertyImage?.();
             })
           )
         );
@@ -2135,6 +2156,69 @@ var require_style_settings_filter = __commonJS({
   }
 });
 
+// src/property-image.js
+var require_property_image = __commonJS({
+  "src/property-image.js"(exports2, module2) {
+    var { TFile } = require("obsidian");
+    var VAR = "--fred-image";
+    var ATTR = "data-fred-image";
+    function imageSource(app, file, value) {
+      if (Array.isArray(value)) value = value[0];
+      if (typeof value !== "string") return null;
+      let text = value.trim();
+      if (text === "") return null;
+      if (/^(https?|data|app):/i.test(text)) return text;
+      const link = /^!?\[\[([^\]]+)\]\]$/.exec(text);
+      if (link) text = link[1];
+      text = text.split("|")[0].split("#")[0].trim();
+      const target = app.metadataCache.getFirstLinkpathDest(text, file.path) ?? app.vault.getAbstractFileByPath(text);
+      return target instanceof TFile ? app.vault.getResourcePath(target) : null;
+    }
+    function propertyValue(frontmatter, name) {
+      if (!frontmatter || !name) return void 0;
+      if (name in frontmatter) return frontmatter[name];
+      const lower = name.toLowerCase();
+      const key = Object.keys(frontmatter).find((k) => k.toLowerCase() === lower);
+      return key === void 0 ? void 0 : frontmatter[key];
+    }
+    function clear(el) {
+      el.style.removeProperty(VAR);
+      el.removeAttribute(ATTR);
+    }
+    function apply(plugin, leaf) {
+      const el = leaf.view.containerEl;
+      const file = leaf.view.file;
+      const { propertyImageEnabled, propertyImageName } = plugin.settings;
+      const src = propertyImageEnabled && file instanceof TFile ? imageSource(plugin.app, file, propertyValue(plugin.app.metadataCache.getFileCache(file)?.frontmatter, propertyImageName.trim())) : null;
+      if (src === null) return clear(el);
+      const css = `url(${JSON.stringify(src)})`;
+      if (el.style.getPropertyValue(VAR) !== css) el.style.setProperty(VAR, css);
+      if (!el.hasAttribute(ATTR)) el.setAttribute(ATTR, "");
+    }
+    function registerPropertyImage2(plugin) {
+      const { app } = plugin;
+      const { workspace } = app;
+      const refresh = () => {
+        for (const leaf of workspace.getLeavesOfType("markdown")) apply(plugin, leaf);
+      };
+      plugin.registerEvent(workspace.on("file-open", refresh));
+      plugin.registerEvent(workspace.on("layout-change", refresh));
+      plugin.registerEvent(workspace.on("active-leaf-change", refresh));
+      plugin.registerEvent(
+        app.metadataCache.on("changed", (file) => {
+          if (workspace.getLeavesOfType("markdown").some((leaf) => leaf.view.file === file)) refresh();
+        })
+      );
+      workspace.onLayoutReady(refresh);
+      plugin.register(() => {
+        for (const leaf of workspace.getLeavesOfType("markdown")) clear(leaf.view.containerEl);
+      });
+      return refresh;
+    }
+    module2.exports = { registerPropertyImage: registerPropertyImage2, imageSource };
+  }
+});
+
 // src/main.js
 var { Plugin } = require("obsidian");
 var { DEFAULT_SETTINGS, FredSettingTab } = require_settings();
@@ -2146,6 +2230,7 @@ var { registerImportantPlugins } = require_important_plugins();
 var { registerItalicUnderscore } = require_italic_underscore();
 var { registerBasesHasNote, hasNoteContent } = require_bases_has_note();
 var { registerStyleSettingsFilter } = require_style_settings_filter();
+var { registerPropertyImage } = require_property_image();
 module.exports = class FredPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
@@ -2158,6 +2243,7 @@ module.exports = class FredPlugin extends Plugin {
     registerItalicUnderscore(this);
     this.updateBasesHasNote = registerBasesHasNote(this);
     this.updateStyleSettingsFilter = registerStyleSettingsFilter(this);
+    this.updatePropertyImage = registerPropertyImage(this);
     this.hasNoteContent = (fileOrPath) => hasNoteContent(this.app, fileOrPath);
   }
   onunload() {
